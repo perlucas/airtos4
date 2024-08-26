@@ -6,7 +6,7 @@ podman run \
 -p 6006:6006 \
 --user root \
 -e GRANT_SUDO=yes \
--v "/Users/lucaspereyra/luqui/airtos2/notebooks":/home/jovyan/work \
+-v "/Users/lucaspereyra/luqui/airtos4/notebooks":/home/jovyan/work \
 --name airtos4-lab \
 jupyter/tensorflow-notebook
 

@@ -17,38 +17,21 @@ from tf_agents.trajectories import time_step as ts
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .trading_portfolio import TradingPortfolio
+
 # Possible Actions the agent can choose
 ACTION_NOOP = 0
-ACTION_WEAK_BUY = 1
-ACTION_REGULAR_BUY = 2
-ACTION_STRONG_BUY = 3
-ACTION_WEAK_SELL = 4
-ACTION_REGULAR_SELL = 5
-ACTION_STRONG_SELL = 6
-_MIN_ACTION = ACTION_NOOP
-_MAX_ACTION = ACTION_STRONG_SELL
+ACTION_BUY = 1
+ACTION_SELL = 2
 
-# Percentages of either budget or shares affected by a given action, ex.: WEAK_BUY means to invest 5% of current budget,
-# REGULAR_SELL means to sell 50% of current shares
-ACTION_PERCENTAGES = [
-    0,      # noop
-    0.05,   # weak buy (budget)
-    0.1,    # regular buy (budget)
-    0.3,    # strong buy (budget)
-    0.3,    # weak sell (shares)
-    0.5,    # regular sell (shares)
-    1,      # strong sell (shares)
-]
+_MIN_ACTION = ACTION_NOOP
+_MAX_ACTION = ACTION_SELL
 
 # Representative colors for each action, mapped by index. Used for rendering actions/environment
 COLOR_CODES = [
     None,       # noop, uncolored
-    '#6AF26F',  # weak buy, light green
-    '#59C05C',  # regular buy, green
-    '#2D8930',  # strong buy, strong green
-    '#F97373',  # weak sell, light red
-    '#F53D3D',  # regular sell, red
-    '#C30000',  # strong sell, strong red
+    '#2D8930',  # buy, strong green
+    '#C30000',  # sell, strong red
 ]
 
 
@@ -75,37 +58,39 @@ class TradingEnv(py_environment.PyEnvironment):
 
         # Validate and process prices and signals from source data
         assert df.ndim == 2
-
-        # Reverse dataframe to sort prices by date => comes ordered from load_dataset function
-        self.df = df
-        
+        assert window_size >= 1
+        self.df = df        
         self.window_size = window_size
-        self.prices, self.signal_features = self._process_data()
+        self.prices, self.signal_features = self._process_data() # implemented in subclasses
 
-        # Define observation and action space
+        # Define observation space
+        # For each day, we compute M indicator values. Then the total dimensions will be W * M
         num_dimensions = window_size * self.signal_features.shape[1]
+        
         self._observation_spec = array_spec.BoundedArraySpec(
             # Reshape into N-dim array for better support
             shape=(num_dimensions,),
             dtype=np.float32,
-            minimum=[-5e0] * num_dimensions,
+            minimum=[-5e0] * num_dimensions, # Indicators are z-score normalized, theoretically, they should range from -3 to 3
             maximum=[5e0] * num_dimensions,
             name='observation')
 
+        # Define action space
         self._action_spec = array_spec.BoundedArraySpec(
             shape=(), dtype=np.int32, minimum=_MIN_ACTION, maximum=_MAX_ACTION, name='action')
 
         # Values needed for initializing episodes
-        self._start_tick = self.window_size
+
+        # First W prices are used as inputs for computing TI values as the agent's 1st input set
+        # Price W-1 (zero-indexed) will be the act-on price
+        self._start_tick = self.window_size - 1
         self._end_tick = len(self.prices) - 1
-        # Initial budget is enough money to buy 100 shares
-        self._initial_funds = 100 * self.prices[self._start_tick]
-        self._final_funds = None
+        
         self._current_tick = None
-        self._shares = None
-        self._budget = None
         self._episode_ended = None
         self._history = None
+        self._profit = None
+        self._portfolio = TradingPortfolio()
 
     def action_spec(self):
         """Get action space specifications
@@ -133,8 +118,7 @@ class TradingEnv(py_environment.PyEnvironment):
 
         # Add info
         plt.suptitle(
-            "Initial Funds: %.2f" % self._initial_funds + ' ~ ' +
-            "Final Funds: %.2f" % self._final_funds
+            "Total Profit: %.2f" % self._profit
         )
 
     def render(self, mode="human"):
@@ -163,9 +147,9 @@ class TradingEnv(py_environment.PyEnvironment):
     def _reset(self):
         self._history = []
         self._current_tick = self._start_tick
-        self._shares = 0
-        self._budget = self._initial_funds
         self._episode_ended = False
+        self._profit = 0
+        self._portfolio.reset()
 
         observation = self._get_observation()
         return ts.restart(np.array(observation, dtype=np.float32))
@@ -175,22 +159,34 @@ class TradingEnv(py_environment.PyEnvironment):
             # The last action ended the episode. Ignore the current action and start a new episode.
             return self.reset()
 
+        # Current stock price
+        current_price = self.prices[ self._current_tick ]
+
+        # Compute step reward and add it to profit
+        step_reward = 0
+        if action == ACTION_BUY:
+            step_reward = self._portfolio.open_long(current_price)
+        elif action == ACTION_SELL:
+            step_reward = self._portfolio.open_short(current_price)
+
+        self._profit += step_reward
+
+        # Store history for rendering purposes
+        self._history.append(action)
+
         self._current_tick += 1
-
-        step_reward = self._update_and_get_reward(action)
-
-        if self._current_tick == self._end_tick or not self._can_still_operate():
-            # Finish episode if reached last possible tick or can't operate
+        
+        if self._current_tick == self._end_tick:
+            # Finish episode if reached last tick
             self._episode_ended = True
 
         observation = self._get_observation()
 
+        # Finish episode
         if self._episode_ended:
-            self._final_funds = self._budget + \
-                self._shares * \
-                self.prices[self._current_tick]  # This is needed for rendering final budget
             return ts.termination(np.array(observation, dtype=np.float32), reward=step_reward)
 
+        # Move on to next step
         return ts.transition(np.array(observation, dtype=np.float32), reward=step_reward, discount=1.0)
 
     def _get_observation(self):
@@ -199,78 +195,9 @@ class TradingEnv(py_environment.PyEnvironment):
         features = self.signal_features[(
             self._current_tick-self.window_size+1):self._current_tick+1]
         # Reshape features to match N-dim array (observation space)
+        # print(features)
         return np.reshape(features, (num_dimensions, ))
 
     def _process_data(self):
         raise NotImplementedError(
             'has not been implemented, try using a subclass')
-
-    def _update_and_get_reward(self, action):
-
-        # Compute funds before action was taken
-        prev_price = self.prices[self._current_tick - 1]
-        prev_funds = self._budget + self._shares * prev_price
-
-        # Apply action to update state: budget and shares
-        new_shares, operation_shares = self._compute_new_shares(
-            action, price=prev_price)
-        new_budget = self._compute_new_budget(
-            action, operation_shares=operation_shares, price=prev_price)
-
-        # Save checkpoint in history, save it as NOOP if no real operation was performed
-        self._history.append(action if operation_shares > 0 else ACTION_NOOP)
-
-        assert new_budget >= 0, f"New budget is negative: {new_budget}"
-        assert new_shares >= 0, f"New shares are negative: {new_shares}"
-
-        self._shares = new_shares
-        self._budget = new_budget
-        cur_funds = self._budget + self._shares * \
-            self.prices[self._current_tick]
-
-        return (cur_funds - prev_funds)
-
-    def _compute_new_shares(self, action, price):
-        if action == ACTION_NOOP:
-            return (self._shares, 0)
-
-        is_sell = action in [ACTION_WEAK_SELL,
-                             ACTION_REGULAR_SELL, ACTION_STRONG_SELL]
-        # Cannot sell shares if has not bought any before
-        if self._shares == 0 and is_sell:
-            return (0, 0)
-
-        if is_sell:
-            # Compute operation shares from current shares
-            operation_shares = np.floor(
-                self._shares * ACTION_PERCENTAGES[action])
-            # Cannot sell more than its current holdings
-            operation_shares = np.min([operation_shares, self._shares])
-            return (self._shares - operation_shares, operation_shares)
-
-        # It's buy
-        budget = np.max([0, self._budget])  # In case it's negative
-        operation_shares = np.floor(
-            (budget * ACTION_PERCENTAGES[action]) / price)  # Number of shares to buy, percentage of budget
-        return (self._shares + operation_shares, operation_shares)
-
-    def _compute_new_budget(self, action, operation_shares, price):
-        if action == ACTION_NOOP:
-            return self._budget
-
-        is_sell = action in [ACTION_WEAK_SELL,
-                             ACTION_REGULAR_SELL, ACTION_STRONG_SELL]
-        # Increase budget if selling shares, decrease budget if buying
-        if is_sell:
-            return self._budget + price * operation_shares
-        return self._budget - price * operation_shares
-
-    def _can_still_operate(self):
-        if self._shares > 0:
-            return True
-
-        budget = np.max([0, self._budget])  # In case it's negative
-        min_price = np.min(self.prices[self._current_tick:])
-        min_shares_to_buy = np.floor(
-            budget * ACTION_PERCENTAGES[ACTION_WEAK_BUY] / min_price)  # can it buy at least 1 share?
-        return min_shares_to_buy > 0

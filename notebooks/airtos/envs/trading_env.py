@@ -17,7 +17,7 @@ from tf_agents.trajectories import time_step as ts
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .trading_portfolio import TradingPortfolio
+from .trading_session import TradingSession
 
 # Possible Actions the agent can choose
 ACTION_NOOP = 0
@@ -90,7 +90,7 @@ class TradingEnv(py_environment.PyEnvironment):
         self._episode_ended = None
         self._history = None
         self._profit = None
-        self._portfolio = TradingPortfolio()
+        self._session = TradingSession(fee=2)
 
     def action_spec(self):
         """Get action space specifications
@@ -149,7 +149,7 @@ class TradingEnv(py_environment.PyEnvironment):
         self._current_tick = self._start_tick
         self._episode_ended = False
         self._profit = 0
-        self._portfolio.reset()
+        self._session.reset()
 
         observation = self._get_observation()
         return ts.restart(np.array(observation, dtype=np.float32))
@@ -165,10 +165,13 @@ class TradingEnv(py_environment.PyEnvironment):
         # Compute step reward and add it to profit
         step_reward = 0
         if action == ACTION_BUY:
-            step_reward = self._portfolio.open_long(current_price)
+            step_reward = self._session.open_long(current_price)
         elif action == ACTION_SELL:
-            step_reward = self._portfolio.open_short(current_price)
+            step_reward = self._session.open_short(current_price)
 
+        # Add daily punishment
+        step_reward -= 10
+        
         self._profit += step_reward
 
         # Store history for rendering purposes
@@ -179,6 +182,7 @@ class TradingEnv(py_environment.PyEnvironment):
         if self._current_tick == self._end_tick:
             # Finish episode if reached last tick
             self._episode_ended = True
+            self._profit += self._session.end_session(current_price)
 
         observation = self._get_observation()
 

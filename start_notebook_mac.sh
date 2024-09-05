@@ -8,7 +8,9 @@ podman run \
 -e GRANT_SUDO=yes \
 -v "/Users/lucaspereyra/luqui/airtos4/notebooks":/home/jovyan/work \
 --name airtos4-lab \
-jupyter/tensorflow-notebook
+jupyter/tensorflow-notebook \
+start-notebook.sh --NotebookApp.allow_origin='*' --NotebookApp.disable_check_xsrf=True
+
 
 # podman run \
 # -it \

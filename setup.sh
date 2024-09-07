@@ -37,14 +37,14 @@ pip3 install keras-tuner
 pip3 install pandas pandas-ta numpy
 
 # Install Git
-sudo apt install git
+#sudo apt install git
 
-git --version
+#git --version
 
 # Cloning the repo
-mkdir /content
-cd /content
-git clone https://github.com/perlucas/airtos4.git
+#mkdir /content
+#cd /content
+#git clone https://github.com/perlucas/airtos4.git
 
 cd /content/airtos4/notebooks/airtos/
 

@@ -100,7 +100,7 @@ gpus = tf.config.list_physical_devices('GPU')
 if gpus:
     try:
         # Restrict TensorFlow to only use the first GPU
-        tf.config.set_visible_devices(gpus[0], 'GPU')
+        # tf.config.set_visible_devices(gpus[0], 'GPU')
 
         # Set memory growth to prevent TensorFlow from allocating all GPU memory at once
         for gpu in gpus:

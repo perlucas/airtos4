@@ -95,20 +95,6 @@ print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2, \
     "This notebook requires TensorFlow 2.0 or above."
 
-# Configure GPUs
-gpus = tf.config.list_physical_devices('GPU')
-if gpus:
-    try:
-        # Restrict TensorFlow to only use the first GPU
-        # tf.config.set_visible_devices(gpus[0], 'GPU')
-
-        # Set memory growth to prevent TensorFlow from allocating all GPU memory at once
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-    except RuntimeError as e:
-        print(e)
-
-
 
 # ====================================== Create environments ======================================
 PARAM_ENV_TYPE = 'com'

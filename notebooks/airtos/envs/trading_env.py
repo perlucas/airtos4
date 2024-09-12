@@ -27,6 +27,11 @@ ACTION_SELL = 2
 _MIN_ACTION = ACTION_NOOP
 _MAX_ACTION = ACTION_SELL
 
+# Posible number of shares the agent can trade 1: 5 shares; 2: 10 shares; 3: 20 shares
+_MIN_NUM_SHARES = 1
+_MIN_NUM_SHARES = 3
+
+
 # Representative colors for each action, mapped by index. Used for rendering actions/environment
 COLOR_CODES = [
     None,       # noop, uncolored
@@ -77,7 +82,11 @@ class TradingEnv(py_environment.PyEnvironment):
 
         # Define action space
         self._action_spec = array_spec.BoundedArraySpec(
-            shape=(), dtype=np.int32, minimum=_MIN_ACTION, maximum=_MAX_ACTION, name='action')
+            shape=(2,),
+            dtype=np.int32,
+            minimum=np.array([_MIN_ACTION, _MIN_NUM_SHARES]),
+            maximum=np.array([_MAX_ACTION, _MAX_NUM_SHARES]),
+            name='action')
 
         # Values needed for initializing episodes
 
@@ -169,8 +178,8 @@ class TradingEnv(py_environment.PyEnvironment):
         elif action == ACTION_SELL:
             step_reward = self._session.open_short(current_price)
 
-        # Add daily punishment
-        step_reward -= 10
+        # Add daily punishment (disabled)
+        # step_reward -= 10
         
         self._profit += step_reward
 

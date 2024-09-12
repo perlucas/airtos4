@@ -49,7 +49,7 @@ class TradingSession:
         '''
         assert len(self._shorts) * len(self._longs) == 0 # We cannot have both open shorts and longs
         
-        discount = price * (self._fee/100) # Apply fee
+        discount = price * num_shares * (self._fee/100) # Apply fee
 
         remaining_to_buy = num_shares
         profit = 0
@@ -89,7 +89,7 @@ class TradingSession:
         '''
         assert len(self._shorts) * len(self._longs) == 0 # We cannot have both open shorts and longs
         
-        discount = price * (self._fee/100) # Apply fee
+        discount = price * num_shares * (self._fee/100) # Apply fee
 
         remaining_to_sell = num_shares
         profit = 0
@@ -383,6 +383,149 @@ def __run_simulation_tests():
             ),
             'end_session_price': 10,
             'end_session_profit': 55
+        },
+        # Fee based tests
+        {
+            # (fee) more longs than shorts, same num_shares (a-1)
+            'fee': 2,
+            'positions': (
+                ('l', 5, 2, -10 * 0.02),
+                ('l', 4, 2, -8 * 0.02),
+                ('s', 10, 2, 10 - 20 * 0.02),
+            ),
+            'end_session_price': 5,
+            'end_session_profit': 2 - 10 * 0.02
+        },
+        {
+            # (fee) more longs than shorts, different num_shares, same N. operations (a-1-1)
+            'fee': 2,
+            'positions': (
+                ('l', 5, 4, -20 * 0.02),
+                ('s', 10, 2, 10 - 20 * 0.02),
+                ('l', 3, 3, -9 * 0.02),
+                ('s', 12, 3, 23 - 36 * 0.02),
+            ),
+            'end_session_price': 5,
+            'end_session_profit': 4 - 10*0.02
+        },
+        {
+            # (fee) more longs than shorts, different num_shares, different N. operations (a-1-2)
+            'fee': 2,
+            'positions': (
+                ('l', 2, 3, -6 * 0.02),
+                ('s', 5, 1, 3 - 5 * 0.02),
+                ('l', 3, 2, -6 * 0.02),
+            ),
+            'end_session_price': 10,
+            'end_session_profit': 30 - 40 * 0.02
+        },
+        {
+            # (nfee) more longs than shorts, different num_shares, different N. operations (a-1-3)
+            'fee': 2,
+            'positions': (
+                ('l', 3, 10, -30 * 0.02),
+                ('s', 8, 2, 10 - 16 * 0.02),
+                ('s', 9, 2, 12 - 18 * 0.02),
+            ),
+            'end_session_price': 7,
+            'end_session_profit': 24 - 42 * 0.02
+        },
+        {
+            # (fee) more shorts than longs, same num_shares, different N. operations (b-1)
+            'fee': 2,
+            'positions': (
+                ('l', 2, 2, -4 * 0.02),
+                ('s', 3, 2, 2 - 6 * 0.02),
+                ('s', 3.5, 2, -7 * 0.02),
+            ),
+            'end_session_price': 7,
+            'end_session_profit': -7 - 14 * 0.02
+        },
+        {
+            # (fee) more shorts than longs, different num_shares, same N. operations (b-1-1)
+            'fee': 2,
+            'positions': (
+                ('l', 3, 4, -12 * 0.02),
+                ('s', 5, 6, 8 - 30 * 0.02),
+                ('l', 2, 2, 6 - 4 * 0.02),
+                ('s', 7, 10, -70 * 0.02),
+            ),
+            'end_session_price': 5,
+            'end_session_profit': 20 - 50 * 0.02
+        },
+        {
+            # (fee) more shorts than longs, different num_shares, different N. operations (b-1-2)
+            'fee': 2,
+            'positions': (
+                ('s', 12, 5, -60 * 0.02),
+                ('l', 6, 2, 12 - 12 * 0.02),
+                ('s', 8, 3, -24 * 0.02),
+            ),
+            'end_session_price': 2,
+            'end_session_profit': 48 - 12 * 0.02
+        },
+        {
+            # (fee) more shorts than longs, different num_shares, different N. operations (b-1-3)
+            'fee': 2,
+            'positions': (
+                ('l', 4, 10, -40 * 0.02),
+                ('s', 15, 25, 110 - 375 * 0.02),
+                ('l', 5, 5, 50 - 25 * 0.02),
+            ),
+            'end_session_price': 10,
+            'end_session_profit': 50 - 100 * 0.02
+        },
+        {
+            # (fee) same shorts and longs, same num_shares, same N. operations (c-1)
+            'fee': 5,
+            'positions': (
+                ('s', 16, 3, -48 * 0.05),
+                ('l', 5, 3, 33 - 15 * 0.05),
+                ('s', 10, 3, -30 * 0.05),
+                ('l', 4, 3, 18 - 12 * 0.05),
+            ),
+            'end_session_price': 3,
+            'end_session_profit': 0
+        },
+        {
+            # (fee) only longs, different num_shares (d-1)
+            'fee': 3,
+            'positions': (
+                ('l', 5, 10, -50 * 0.03),
+                ('l', 6, 10, -60 * 0.03),
+            ),
+            'end_session_price': 3,
+            'end_session_profit': -50 - 60 * 0.03
+        },
+        {
+            # (fee) only longs, different num_shares (d-2)
+            'fee': 2,
+            'positions': (
+                ('l', 5, 8, -40 * 0.02),
+                ('l', 4, 3, -12 * 0.02),
+            ),
+            'end_session_price': 10,
+            'end_session_profit': 58 - 110 * 0.02
+        },
+        {
+            # (non-fee) only shorts, same num_shares (e-1)
+            'fee': 2,
+            'positions': (
+                ('s', 10, 20, -200 * 0.02),
+                ('s', 11, 20, -220 * 0.02),
+            ),
+            'end_session_price': 15,
+            'end_session_profit': -180 - 600 * 0.02
+        },
+        {
+            # (non-fee) only shorts, different num_shares (e-2)
+            'fee': 2,
+            'positions': (
+                ('s', 13, 5, -65 * 0.02),
+                ('s', 15, 8, -120 * 0.02),
+            ),
+            'end_session_price': 10,
+            'end_session_profit': 55 - 130 * 0.02
         },
     ]
 

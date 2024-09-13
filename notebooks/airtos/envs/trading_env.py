@@ -21,29 +21,38 @@ from .trading_session import TradingSession
 
 # Possible Actions the agent can choose
 ACTION_NOOP = 0
-ACTION_BUY = 1
-ACTION_SELL = 2
+ACTION_BUY_LOW = 1
+ACTION_BUY_MEDIUM = 2
+ACTION_BUY_HIGH = 3
+ACTION_SELL_LOW = 4
+ACTION_SELL_MEDIUM = 5
+ACTION_SELL_HIGH = 6
 
 _MIN_ACTION = ACTION_NOOP
-_MAX_ACTION = ACTION_SELL
+_MAX_ACTION = ACTION_SELL_HIGH
 
-# Posible number of shares the agent can trade 1: 5 shares; 2: 10 shares; 3: 20 shares
-_MIN_NUM_SHARES = 1
-_MED_NUM_SHARES = 2
-_MAX_NUM_SHARES = 3
-def get_num_shares(ref):
-    if ref == _MIN_NUM_SHARES:
-        return 5
-    elif ref == _MED_NUM_SHARES:
-        return 10
-    elif ref == _MAX_NUM_SHARES:
-        return 20
+# Posible number of shares the agent can trade: 5 shares, 10 shares or 20 shares
+def extract_action_and_num_shares(code):
+    code_action_map = [
+        ('noop', 0),  # No op
+        ('buy', 5),   # buy low
+        ('buy', 10),  # buy medium
+        ('buy', 20),  # buy high
+        ('sell', 5),  # sell low
+        ('sell', 10), # sell medium
+        ('sell', 20), # sell high
+    ]
+    return code_action_map[code]
 
 
 # Representative colors for each action, mapped by index. Used for rendering actions/environment
 COLOR_CODES = [
     None,       # noop, uncolored
     '#2D8930',  # buy, strong green
+    '#2D8930',  # buy, strong green
+    '#2D8930',  # buy, strong green
+    '#C30000',  # sell, strong red
+    '#C30000',  # sell, strong red
     '#C30000',  # sell, strong red
 ]
 
@@ -90,10 +99,10 @@ class TradingEnv(py_environment.PyEnvironment):
 
         # Define action space
         self._action_spec = array_spec.BoundedArraySpec(
-            shape=(2,),
+            shape=(),
             dtype=np.int32,
-            minimum=np.array([_MIN_ACTION, _MIN_NUM_SHARES]),
-            maximum=np.array([_MAX_ACTION, _MAX_NUM_SHARES]),
+            minimum=_MIN_ACTION,
+            maximum=_MAX_ACTION,
             name='action')
 
         # Values needed for initializing episodes
@@ -171,7 +180,7 @@ class TradingEnv(py_environment.PyEnvironment):
         observation = self._get_observation()
         return ts.restart(np.array(observation, dtype=np.float32))
 
-    def _step(self, action_inputs):
+    def _step(self, action_code):
         if self._episode_ended:
             # The last action ended the episode. Ignore the current action and start a new episode.
             return self.reset()
@@ -181,12 +190,11 @@ class TradingEnv(py_environment.PyEnvironment):
 
         # Compute step reward and add it to profit
         step_reward = 0
-        action, num_shares_reference = action_inputs
-        num_shares = get_num_shares(num_shares_reference)
+        action, num_shares = extract_action_and_num_shares(action_code)
         
-        if action == ACTION_BUY:
+        if action == 'buy':
             step_reward = self._session.open_long(current_price, num_shares)
-        elif action == ACTION_SELL:
+        elif action == 'sell':
             step_reward = self._session.open_short(current_price, num_shares)
 
         # Add daily punishment (disabled)
@@ -195,7 +203,7 @@ class TradingEnv(py_environment.PyEnvironment):
         self._profit += step_reward
 
         # Store history for rendering purposes
-        self._history.append(action)
+        self._history.append(action_code)
 
         self._current_tick += 1
         

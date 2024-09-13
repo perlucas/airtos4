@@ -57,7 +57,12 @@ class CombinedEnv(TradingEnv):
         macd = macd[self.frame_bound[0] - self.window_size: self.frame_bound[1]]
         macd_z = z_score(macd)
 
-        features = np.column_stack((ma1_z, ma2_z, ma3_z, rsi_z, adx_z, macd_z))
+        # Compute 5th Indicator: Volume
+        volume = self.df.loc[:, 'Volume'].to_numpy()
+        volume = volume[self.frame_bound[0] - self.window_size: self.frame_bound[1]]
+        volume_z = z_score(volume)
+
+        features = np.column_stack((ma1_z, ma2_z, ma3_z, rsi_z, adx_z, macd_z, volume_z))
         
         # Return prices and the features (inputs for the model)
         return prices.astype(np.float32), features.astype(np.float32)

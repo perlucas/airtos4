@@ -29,7 +29,15 @@ _MAX_ACTION = ACTION_SELL
 
 # Posible number of shares the agent can trade 1: 5 shares; 2: 10 shares; 3: 20 shares
 _MIN_NUM_SHARES = 1
-_MIN_NUM_SHARES = 3
+_MED_NUM_SHARES = 2
+_MAX_NUM_SHARES = 3
+def get_num_shares(ref):
+    if ref == _MIN_NUM_SHARES:
+        return 5
+    elif ref == _MED_NUM_SHARES:
+        return 10
+    elif ref == _MAX_NUM_SHARES:
+        return 20
 
 
 # Representative colors for each action, mapped by index. Used for rendering actions/environment
@@ -99,7 +107,7 @@ class TradingEnv(py_environment.PyEnvironment):
         self._episode_ended = None
         self._history = None
         self._profit = None
-        self._session = TradingSession(fee=2)
+        self._session = TradingSession(fee = 2)
 
     def action_spec(self):
         """Get action space specifications
@@ -163,7 +171,7 @@ class TradingEnv(py_environment.PyEnvironment):
         observation = self._get_observation()
         return ts.restart(np.array(observation, dtype=np.float32))
 
-    def _step(self, action):
+    def _step(self, action_inputs):
         if self._episode_ended:
             # The last action ended the episode. Ignore the current action and start a new episode.
             return self.reset()
@@ -173,10 +181,13 @@ class TradingEnv(py_environment.PyEnvironment):
 
         # Compute step reward and add it to profit
         step_reward = 0
+        action, num_shares_reference = action_inputs
+        num_shares = get_num_shares(num_shares_reference)
+        
         if action == ACTION_BUY:
-            step_reward = self._session.open_long(current_price)
+            step_reward = self._session.open_long(current_price, num_shares)
         elif action == ACTION_SELL:
-            step_reward = self._session.open_short(current_price)
+            step_reward = self._session.open_short(current_price, num_shares)
 
         # Add daily punishment (disabled)
         # step_reward -= 10

@@ -7,7 +7,7 @@ podman run \
 --user root \
 -e GRANT_SUDO=yes \
 -v "/Users/lucaspereyra/luqui/airtos4/notebooks":/home/jovyan/work \
---name airtos4-lab--dqn \
+--name airtos4-lab--dueling-dqn \
 jupyter/tensorflow-notebook \
 start-notebook.sh --NotebookApp.allow_origin='*' --NotebookApp.disable_check_xsrf=True
 

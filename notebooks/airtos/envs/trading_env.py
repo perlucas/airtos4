@@ -28,9 +28,9 @@ _MIN_ACTION = ACTION_NOOP
 _MAX_ACTION = ACTION_SELL
 
 # Posible number of shares the agent can trade 1: 5 shares; 2: 10 shares; 3: 20 shares
-_MIN_NUM_SHARES = 1
-_MED_NUM_SHARES = 2
-_MAX_NUM_SHARES = 3
+_MIN_NUM_SHARES = 0
+_MED_NUM_SHARES = 1
+_MAX_NUM_SHARES = 2
 def get_num_shares(ref):
     if ref == _MIN_NUM_SHARES:
         return 5

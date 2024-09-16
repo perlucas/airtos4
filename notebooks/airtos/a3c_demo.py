@@ -154,11 +154,12 @@ class A3CAgent:
 MAX_EPISODES = 1000
 
 class Worker(threading.Thread):
-    def __init__(self, env, agent, global_episode_counter):
+    def __init__(self, env, agent, global_episode_counter, lock):
         threading.Thread.__init__(self)
         self.env = env
         self.agent = agent
         self.global_episode_counter = global_episode_counter
+        self.lock = lock
 
     def run(self):
         while self.global_episode_counter < MAX_EPISODES:
@@ -185,21 +186,22 @@ class Worker(threading.Thread):
                 done = 1 if time_step.is_last() else 0
                 
                 # Train step
-                self.agent.train_step(observations, actions, reward, next_observations, done)
+                with self.lock:
+                    self.agent.train_step(observations, actions, reward, next_observations, done)
 
                 observations = next_observations
                 total_reward += reward
 
             self.global_episode_counter += 1
 
-            print(f"Episode {self.global_episode_counter} Total Reward: {total_reward}")
+            print(f"[{self.name}] Episode {self.global_episode_counter} Total Reward: {total_reward}")
 
             if self.global_episode_counter % 10 == 0:
                 self.env = get_random_train_env()
 
             if self.global_episode_counter % 12 == 0:
                 avg_return = compute_avg_return(eval_env, self.agent)
-                print(f"Episode {self.global_episode_counter} Average Return: {avg_return}")
+                print(f"[{self.name}] Episode {self.global_episode_counter} Average Return: {avg_return}")
 
 # ====================================== 6. Define Environment Utils ======================================
 
@@ -302,13 +304,14 @@ def compute_avg_return(environment, agent, num_episodes=2):
 
 # ====================================== 7. Train A3C Agent ======================================
 # Start workers
-num_workers = 1
+global_lock = threading.Lock()
+num_workers = 4
 global_episode_counter = 0
 agent = A3CAgent(train_env_sample.action_spec(), train_env_sample.observation_spec())
-workers = [Worker(train_env_sample, agent, global_episode_counter) for _ in range(num_workers)]
+workers = [Worker(train_env_sample, agent, global_episode_counter, global_lock) for _ in range(num_workers)]
 
 for worker in workers:
     worker.start()
 
 for worker in workers:
-    worker.join()
+    worker.join() # Wait for all workers to finish

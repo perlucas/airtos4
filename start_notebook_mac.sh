@@ -18,3 +18,8 @@ start-notebook.sh --NotebookApp.allow_origin='*' --NotebookApp.disable_check_xsr
 # --rm \
 # -v "/Users/lucaspereyra/luqui/airtos2/notebooks":/home/jovyan/work \
 # jupyter/datascience-notebook 
+
+podman run -it --rm \
+-v "/Users/lucaspereyra/luqui/airtos4/notebooks/airtos":/usr/src/app/notebooks/airtos \
+--name c51-vm \
+python-c51

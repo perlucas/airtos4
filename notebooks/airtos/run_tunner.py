@@ -94,7 +94,7 @@ class AirtosTunner(kt.BayesianOptimization):
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
     objective=kt.Objective(name='avg_return', direction='max'),
-    max_trials=2,
+    max_trials=5,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
     directory=os.path.join(os.path.dirname(__file__),EXECUTION_ID),
@@ -102,7 +102,7 @@ tuner = AirtosTunner(
     tuner_id='airtos4_tuner1',
     overwrite=False,
     executions_per_trial=1,
-    allow_new_entries=False,
+    allow_new_entries=True,
     tune_new_entries=True
 )
 
@@ -110,8 +110,16 @@ tuner.search_space_summary(extended=True)
 
 tuner.search()
 
-best_hps = tuner.get_best_hyperparameters()
-print(best_hps)
+# Get best hyperparameters
+best_hps = tuner.get_best_hyperparameters(num_trials=40)
+best_values = []
 for hp in best_hps:
     print(hp.values)
+    best_values.append(hp.values)
+
+# Save best values to file
+best_values_file = os.path.join(os.path.dirname(__file__), f"{EXECUTION_ID}/best_values.txt")
+with open(best_values_file, 'w') as f:
+    f.write(str(best_values))
+
 print('Finished!')

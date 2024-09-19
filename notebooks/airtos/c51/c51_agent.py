@@ -53,7 +53,8 @@ class C51Agent:
             max_q_value=max_q_value,
             n_step_update=n_step_update,
             # td_errors_loss_fn=common.element_wise_squared_loss, use default error
-            gamma=0,
+            gamma=1.0,
+            epsilon_greedy=0.1,  # Exploration factor
             train_step_counter=train_step_counter)
         
         self.agent.initialize()

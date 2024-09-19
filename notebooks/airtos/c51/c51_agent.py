@@ -119,6 +119,12 @@ class C51Agent:
         file_writer = tf.summary.create_file_writer(f'{log_dir}/metrics')
         file_writer.set_as_default()
 
+        # Compute average return variation and scale by importance factor
+        importance_factor = 0.1
+        importance_factor_update = 0.08
+        prev_avg_return = avg_return
+        cumulated_deltas = 0
+
         for _ in range(num_iterations):
             # Collect a few steps using collect_policy and save to the replay buffer.
             for _ in range(collect_steps_per_iteration):
@@ -138,11 +144,18 @@ class C51Agent:
 
             # Evaluate agent
             if step % evaluation_interval == 0:
-                avg_return = compute_avg_return(
-                    eval_env, self.agent.policy, eval_episodes)
-                print('step = {0}: Average Return = {1:.2f}'.format(
-                    step, avg_return))
+                avg_return = compute_avg_return(eval_env, self.agent.policy, eval_episodes)
+
+                # Compute average return variation and scale by importance factor
+                avg_return_delta = (avg_return - prev_avg_return) / abs(prev_avg_return) if prev_avg_return != 0 else 0
+                avg_return_delta *= importance_factor
+                prev_avg_return = avg_return
+                cumulated_deltas += avg_return_delta # Cumulate deltas
+                print('step = {0}: Average Return = {1:.2f} Average Return Delta = {2:.2f} Importance = {3:.2f}'.format(
+                    step, avg_return, avg_return_delta, importance_factor))
                 tf.summary.scalar('average return', data=avg_return, step=step)
+                tf.summary.scalar('cumulated deltas', data=cumulated_deltas, step=step)
+                importance_factor = min(importance_factor + importance_factor_update, 1) # Update importance factor
 
 
             # Change training env
@@ -153,7 +166,10 @@ class C51Agent:
 
         avg_return = compute_avg_return(eval_env, self.agent.policy, eval_episodes)
 
-        return avg_return
+        return {
+            'final_avg_return': avg_return,
+            'cumulated_deltas': cumulated_deltas
+        }
         
 
     def _collect_step(self, environment, policy):

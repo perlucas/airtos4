@@ -29,7 +29,7 @@ PARAM_MAX_Q_VALUE = 1000
 PARAM_N_STEP_UPDATE = 2
 PARAM_REPLAY_BUFFER_CAPACITY = 100000
 PARAM_BATCH_SIZE = 64
-PARAM_NUM_ITERATIONS = 40
+PARAM_NUM_ITERATIONS = 300
 PARAM_COLLECT_STEPS_PER_ITERATION = 200
 
 
@@ -71,7 +71,7 @@ class AirtosHyperModel(kt.HyperModel):
             f"{EXECUTION_ID}/trial_{trial.trial_id}"
         )
 
-        avg_return = agent.train_agent(
+        final_stats = agent.train_agent(
             initial_collect_steps=1000,
             batch_size=hp.Choice('batch_size', [32, 64, 128]),
             log_dir=LOG_DIR,
@@ -79,9 +79,7 @@ class AirtosHyperModel(kt.HyperModel):
             collect_steps_per_iteration=PARAM_COLLECT_STEPS_PER_ITERATION
         )
 
-        return {
-            'avg_return': avg_return
-        }
+        return final_stats
 
 class AirtosTunner(kt.BayesianOptimization):
 
@@ -93,7 +91,7 @@ class AirtosTunner(kt.BayesianOptimization):
 
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
-    objective=kt.Objective(name='avg_return', direction='max'),
+    objective=kt.Objective(name='cumulated_deltas', direction='max'),
     max_trials=5,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,

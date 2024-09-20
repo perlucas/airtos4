@@ -8,7 +8,6 @@ class DuelingQNetwork(QNetwork):
         # Number of actions
         num_actions = action_spec.maximum - action_spec.minimum + 1
         
-        
         # Create shared layers using fc_layer_params
         self.shared_layers = tf.keras.Sequential()
         for units in fc_layer_params:

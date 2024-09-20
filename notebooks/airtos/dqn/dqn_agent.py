@@ -40,7 +40,7 @@ class DQNAgent:
             train_step_counter=train_step_counter,
             gamma=1.0,
             epsilon_greedy=0.1,  # Exploration factor
-            target_update_period=10  # Periodic updates of target network
+            target_update_period=20  # Periodic updates of target network
         )
         
         self.agent.initialize()

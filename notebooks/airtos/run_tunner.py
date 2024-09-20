@@ -22,7 +22,7 @@ assert version.parse(tf.__version__).release[0] >= 2, "This notebook requires Te
 # Training and configuration parameters
 PARAM_REPLAY_BUFFER_CAPACITY = 100000
 PARAM_BATCH_SIZE = 64
-PARAM_NUM_ITERATIONS = 100
+PARAM_NUM_ITERATIONS = 500
 PARAM_COLLECT_STEPS_PER_ITERATION = 200
 
 
@@ -81,7 +81,7 @@ class AirtosTunner(kt.BayesianOptimization):
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
     objective=kt.Objective(name='cumulated_deltas', direction='max'),
-    max_trials=3,
+    max_trials=100,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
     directory=os.path.join(os.path.dirname(__file__),EXECUTION_ID),

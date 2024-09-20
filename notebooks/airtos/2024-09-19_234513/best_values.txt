@@ -1,1 +1,0 @@
-[{'num_layers': 6, 'layer_units': 350, 'learning_rate': 0.003, 'batch_size': 32}, {'num_layers': 9, 'layer_units': 300, 'learning_rate': 0.007, 'batch_size': 128}, {'num_layers': 12, 'layer_units': 200, 'learning_rate': 7e-05, 'batch_size': 32}]

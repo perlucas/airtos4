@@ -17,6 +17,8 @@ from utils import load_dataset
 from envs.combined_env import CombinedEnv
 import numpy as np
 
+import time
+
 # ====================================== 1. Check Tensorflow version ======================================
 print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2, \
@@ -104,7 +106,7 @@ class A3CAgent:
 
         # Compute actor loss
         actor_loss = -log_probs * tf.stop_gradient(advantages)
-        entropy_loss = -0.01 * entropy  # Encourage exploration
+        entropy_loss = -0.06 * entropy  # Encourage exploration
         total_loss = actor_loss + 0.5 * critic_loss + entropy_loss
 
         return tf.reduce_mean(total_loss)
@@ -151,57 +153,71 @@ class A3CAgent:
         return total_loss
 
 # ====================================== 5. Define Worker ======================================
-MAX_EPISODES = 1000
+MAX_EPISODES = 100
 
 class Worker(threading.Thread):
-    def __init__(self, env, agent, global_episode_counter, lock):
+    def __init__(self, env, agent, lock, run_episodes=5):
         threading.Thread.__init__(self)
         self.env = env
         self.agent = agent
-        self.global_episode_counter = global_episode_counter
+        self.episode_counter = 0
         self.lock = lock
+        self.run_episodes = run_episodes
+        self.idle = True
+        self.finished = False
+
+    def set_env(self, env):
+        self.env = env
+
+    def set_episode_counter(self, episode_counter):
+        self.episode_counter = episode_counter
 
     def run(self):
-        while self.global_episode_counter < MAX_EPISODES:
-            time_step = self.env.reset()
-            observations = time_step.observation
-            print(f"Worker {self.name} Episode {self.global_episode_counter} Starting...")
-    
-            done = False
-            total_reward = 0
+        while True:
+            max_episodes = self.episode_counter + self.run_episodes
+            while self.episode_counter < max_episodes:
+                time_step = self.env.reset()
+                observations = time_step.observation
+                print(f"Worker {self.name} Episode {self.episode_counter} Starting...")
+        
+                done = False
+                total_reward = 0
 
-            while not done:
-                # Get the action probabilities for action type and number of shares
-                action_type_probs, num_shares_probs = self.agent.policy(observations)
+                while not done:
+                    # Get the action probabilities for action type and number of shares
+                    action_type_probs, num_shares_probs = self.agent.policy(observations)
 
-                # Sample an action tuple (action type, number of shares)
-                action_type, num_shares = self.agent.sample_actions(action_type_probs, num_shares_probs)
+                    # Sample an action tuple (action type, number of shares)
+                    action_type, num_shares = self.agent.sample_actions(action_type_probs, num_shares_probs)
 
-                # Create action tuple
-                actions = np.array([action_type, num_shares]).reshape(1, 2)
+                    # Create action tuple
+                    actions = np.array([action_type, num_shares]).reshape(1, 2)
+                    
+                    time_step = self.env.step(actions)
+                    next_observations = time_step.observation
+                    reward = time_step.reward
+                    done = 1 if time_step.is_last() else 0
+                    
+                    # Train step
+                    with self.lock:
+                        self.agent.train_step(observations, actions, reward, next_observations, done)
+
+                    observations = next_observations
+                    total_reward += reward
+
+                print(f"[{self.name}] Episode {self.episode_counter} Total Reward: {total_reward}")
+
+                if self.episode_counter % 25 == 0:
+                    avg_return = compute_avg_return(eval_env, self.agent)
+                    print(f"[{self.name}] Episode {self.episode_counter} Average Return: {avg_return}")
                 
-                time_step = self.env.step(actions)
-                next_observations = time_step.observation
-                reward = time_step.reward
-                done = 1 if time_step.is_last() else 0
-                
-                # Train step
-                with self.lock:
-                    self.agent.train_step(observations, actions, reward, next_observations, done)
-
-                observations = next_observations
-                total_reward += reward
-
-            self.global_episode_counter += 1
-
-            print(f"[{self.name}] Episode {self.global_episode_counter} Total Reward: {total_reward}")
-
-            if self.global_episode_counter % 10 == 0:
-                self.env = get_random_train_env()
-
-            if self.global_episode_counter % 12 == 0:
-                avg_return = compute_avg_return(eval_env, self.agent)
-                print(f"[{self.name}] Episode {self.global_episode_counter} Average Return: {avg_return}")
+                self.episode_counter += 1
+            
+            self.idle = True
+            while self.idle:
+                if self.finished:
+                    break
+                time.sleep(5)
 
 # ====================================== 6. Define Environment Utils ======================================
 
@@ -306,12 +322,27 @@ def compute_avg_return(environment, agent, num_episodes=2):
 # Start workers
 global_lock = threading.Lock()
 num_workers = 4
-global_episode_counter = 0
+global_episode_counter = 1
 agent = A3CAgent(train_env_sample.action_spec(), train_env_sample.observation_spec())
-workers = [Worker(train_env_sample, agent, global_episode_counter, global_lock) for _ in range(num_workers)]
+workers = [Worker(train_env_sample, agent, global_lock) for _ in range(num_workers)]
 
 for worker in workers:
+    worker.set_episode_counter(global_episode_counter)
+    global_episode_counter += worker.run_episodes
+    worker.idle = False
     worker.start()
 
+while global_episode_counter < MAX_EPISODES:
+    for worker in workers:
+        if worker.idle:
+            worker.set_episode_counter(global_episode_counter)
+            worker.set_env(get_random_train_env())
+            global_episode_counter += worker.run_episodes
+            worker.idle = False
+            print('Worker assigned new episodes, episodes counter: {}'.format(global_episode_counter))
+    # put the main thread to sleep for a while
+    time.sleep(5)
+
 for worker in workers:
+    worker.finished = True
     worker.join() # Wait for all workers to finish

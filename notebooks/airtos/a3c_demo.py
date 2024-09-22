@@ -6,10 +6,12 @@ import tensorflow as tf
 import os
 
 # Imports 3)
-from tensorflow.keras import layers
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.models import Sequential
 
 # Imports 5)
 import threading
+from queue import Queue
 
 # Imports 6)
 from tf_agents.environments import tf_py_environment
@@ -32,17 +34,29 @@ os.environ['TF_USE_LEGACY_KERAS'] = '1'
 
 # Actor Network
 class Actor(tf.keras.Model):
-    def __init__(self, num_action_types, num_shares_options):
+    def __init__(
+            self,
+            observation_spec,
+            layers=(100,100),
+            num_action_types=3,
+            num_shares_options=3):
         super(Actor, self).__init__()
-        self.fc1 = layers.Dense(128, activation='relu')
-        self.fc2 = layers.Dense(128, activation='relu')
+
+        self.fc = Sequential()
+        _first = True
+        for units in layers:
+            if _first:
+                _first = False
+                self.fc.add(Dense(units, activation='relu', input_shape=observation_spec.shape))
+            else:
+                self.fc.add(Dense(units, activation='relu'))
+        
         # Two output layers, one for action type, one for number of shares
-        self.action_type_logits = layers.Dense(num_action_types)
-        self.num_shares_logits = layers.Dense(num_shares_options)
+        self.action_type_logits = Dense(num_action_types)
+        self.num_shares_logits = Dense(num_shares_options)
 
     def call(self, inputs):
-        x = self.fc1(inputs)
-        x = self.fc2(x)
+        x = self.fc(inputs)
         # Output logits for both action type and number of shares
         action_type_logits = self.action_type_logits(x)
         num_shares_logits = self.num_shares_logits(x)
@@ -51,22 +65,21 @@ class Actor(tf.keras.Model):
 
 # Critic Network
 class Critic(tf.keras.Model):
-    def __init__(self):
+    def __init__(self, layers=(100,100)):
         super(Critic, self).__init__()
-        self.fc1 = layers.Dense(128, activation='relu')
-        self.fc2 = layers.Dense(128, activation='relu')
-        self.value = layers.Dense(1)
+        self.fc = Sequential()
+        for units in layers:
+            self.fc.add(Dense(units, activation='relu'))
+        self.fc.add(Dense(1))
 
     def call(self, inputs):
-        x = self.fc1(inputs)
-        x = self.fc2(x)
-        return self.value(x)
+        return self.fc(inputs)
 
 # ====================================== 4. Define A3C Agent ======================================
 class A3CAgent:
     def __init__(self, action_spec, observation_spec, lr=1e-4):
-        self.actor = Actor(3, 3)
-        self.critic = Critic()
+        self.actor = Actor(observation_spec, layers=(128, 128))
+        self.critic = Critic(layers=(128, 128))
 
         # Optimizers for both actor and critic
         self.actor_optimizer = tf.keras.optimizers.Adam(learning_rate=lr)
@@ -106,7 +119,7 @@ class A3CAgent:
 
         # Compute actor loss
         actor_loss = -log_probs * tf.stop_gradient(advantages)
-        entropy_loss = -0.06 * entropy  # Encourage exploration
+        entropy_loss = -0.02 * entropy  # Encourage exploration
         total_loss = actor_loss + 0.5 * critic_loss + entropy_loss
 
         return tf.reduce_mean(total_loss)
@@ -153,32 +166,30 @@ class A3CAgent:
         return total_loss
 
 # ====================================== 5. Define Worker ======================================
-MAX_EPISODES = 100
+MAX_EPISODES = 50
+jobs_queue: Queue[dict] = Queue()
 
 class Worker(threading.Thread):
-    def __init__(self, env, agent, lock, run_episodes=5):
+    def __init__(self, agent, lock):
         threading.Thread.__init__(self)
-        self.env = env
+        self.env = None
         self.agent = agent
-        self.episode_counter = 0
         self.lock = lock
-        self.run_episodes = run_episodes
-        self.idle = True
-        self.finished = False
-
-    def set_env(self, env):
-        self.env = env
-
-    def set_episode_counter(self, episode_counter):
-        self.episode_counter = episode_counter
 
     def run(self):
-        while True:
-            max_episodes = self.episode_counter + self.run_episodes
-            while self.episode_counter < max_episodes:
+        while not jobs_queue.empty():
+            current_job = jobs_queue.get()
+            print('Got job:', current_job)
+            episode_counter = current_job.get('episode_counter')
+            run_episodes = current_job.get('run_episodes')
+            self.env = get_random_train_env()
+
+            max_episodes = episode_counter + run_episodes
+            print(f"max_episodes: {max_episodes}, episode_counter: {episode_counter}, run_episodes: {run_episodes}")
+            while episode_counter < max_episodes:
                 time_step = self.env.reset()
                 observations = time_step.observation
-                print(f"Worker {self.name} Episode {self.episode_counter} Starting...")
+                print(f"Worker {self.name} Episode {episode_counter} Starting...")
         
                 done = False
                 total_reward = 0
@@ -205,19 +216,13 @@ class Worker(threading.Thread):
                     observations = next_observations
                     total_reward += reward
 
-                print(f"[{self.name}] Episode {self.episode_counter} Total Reward: {total_reward}")
+                print(f"[{self.name}] Episode {episode_counter} Total Reward: {total_reward}")
 
-                if self.episode_counter % 25 == 0:
+                if episode_counter % 25 == 0:
                     avg_return = compute_avg_return(eval_env, self.agent)
-                    print(f"[{self.name}] Episode {self.episode_counter} Average Return: {avg_return}")
+                    print(f"[{self.name}] Episode {episode_counter} Average Return: {avg_return}")
                 
-                self.episode_counter += 1
-            
-            self.idle = True
-            while self.idle:
-                if self.finished:
-                    break
-                time.sleep(5)
+                episode_counter += 1
 
 # ====================================== 6. Define Environment Utils ======================================
 
@@ -323,26 +328,16 @@ def compute_avg_return(environment, agent, num_episodes=2):
 global_lock = threading.Lock()
 num_workers = 4
 global_episode_counter = 1
+episodes_per_job = 5
 agent = A3CAgent(train_env_sample.action_spec(), train_env_sample.observation_spec())
-workers = [Worker(train_env_sample, agent, global_lock) for _ in range(num_workers)]
+workers = [Worker(agent, global_lock) for _ in range(num_workers)]
+
+for _ in range(MAX_EPISODES // episodes_per_job):
+    jobs_queue.put({'episode_counter': global_episode_counter, 'run_episodes': episodes_per_job})
+    global_episode_counter += episodes_per_job
 
 for worker in workers:
-    worker.set_episode_counter(global_episode_counter)
-    global_episode_counter += worker.run_episodes
-    worker.idle = False
     worker.start()
 
-while global_episode_counter < MAX_EPISODES:
-    for worker in workers:
-        if worker.idle:
-            worker.set_episode_counter(global_episode_counter)
-            worker.set_env(get_random_train_env())
-            global_episode_counter += worker.run_episodes
-            worker.idle = False
-            print('Worker assigned new episodes, episodes counter: {}'.format(global_episode_counter))
-    # put the main thread to sleep for a while
-    time.sleep(5)
-
 for worker in workers:
-    worker.finished = True
     worker.join() # Wait for all workers to finish

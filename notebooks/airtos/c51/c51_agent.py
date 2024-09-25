@@ -162,6 +162,11 @@ class C51Agent:
 
         avg_return = compute_avg_return(eval_env, self.agent.policy, eval_episodes)
 
+        # Free up memory
+        del dataset
+        del iterator
+        self.replay_buffer.clear()
+
         return {
             'custom_return': np.average(last_avg_returns),
             'final_avg_return': avg_return

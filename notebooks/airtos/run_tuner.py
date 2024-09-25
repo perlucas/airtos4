@@ -21,7 +21,7 @@ assert version.parse(tf.__version__).release[0] >= 2, "This notebook requires Te
 
 # Training and configuration parameters
 PARAM_REPLAY_BUFFER_CAPACITY = 100000
-PARAM_BATCH_SIZE = 64
+# PARAM_BATCH_SIZE = 64
 PARAM_NUM_ITERATIONS = 500
 PARAM_COLLECT_STEPS_PER_ITERATION = 200
 
@@ -41,7 +41,7 @@ class AirtosHyperModel(kt.HyperModel):
         AGENT_LAYERS = tuple(layers_list)
 
         # Compute optimizer learning rate
-        optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=hp.Choice('learning_rate', [7e-5, 3e-4, 7e-4, 3e-3, 7e-3]))
+        optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=hp.Choice('learning_rate', [7e-6, 3e-5, 7e-5, 3e-4, 7e-4]))
 
         agent = DoubleDQNAgent(
             layers=AGENT_LAYERS,
@@ -57,7 +57,7 @@ class AirtosHyperModel(kt.HyperModel):
 
         LOG_DIR = os.path.join(
             os.path.dirname(__file__),
-            f"{EXECUTION_ID}/trial_{trial.trial_id}"
+            f"train_dodqn/{EXECUTION_ID}/trial_{trial.trial_id}"
         )
 
         final_stats = agent.train_agent(
@@ -80,11 +80,11 @@ class AirtosTunner(kt.BayesianOptimization):
 
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
-    objective=kt.Objective(name='cumulated_deltas', direction='max'),
+    objective=kt.Objective(name='custom_return', direction='max'),
     max_trials=100,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
-    directory=os.path.join(os.path.dirname(__file__),EXECUTION_ID),
+    directory=os.path.join(os.path.dirname(__file__),f'train_dodqn/{EXECUTION_ID}'),
     project_name=f'airtos4_{EXECUTION_ID}',
     tuner_id='airtos4_tuner1',
     overwrite=False,
@@ -105,7 +105,7 @@ for hp in best_hps:
     best_values.append(hp.values)
 
 # Save best values to file
-best_values_file = os.path.join(os.path.dirname(__file__), f"{EXECUTION_ID}/best_values.txt")
+best_values_file = os.path.join(os.path.dirname(__file__), f"train_dodqn/{EXECUTION_ID}/best_values.txt")
 with open(best_values_file, 'w') as f:
     f.write(str(best_values))
 

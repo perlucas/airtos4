@@ -13,4 +13,4 @@ RUN apt install -y libhdf5-dev
 RUN apt install python3-h5py -y
 RUN pip install tensorflow-probability==0.23.0 "tensorflow<=2.16" tf-keras tf-agents pandas pandas-ta numpy matplotlib scipy scikit-learn keras-tuner --upgrade
 
-CMD ["python", "run_tunner.py"]
+CMD ["python", "run_tuner.py"]

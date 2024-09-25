@@ -4,6 +4,7 @@ from tf_agents.agents.categorical_dqn import categorical_dqn_agent
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from tf_agents.trajectories import trajectory
 from tf_agents.utils import common
+import numpy as np
 
 from utils.envs import train_env_sample, get_random_train_env, eval_env
 from utils.training import get_random_policy, compute_avg_return
@@ -120,11 +121,9 @@ class C51Agent:
         file_writer = tf.summary.create_file_writer(f'{log_dir}/metrics')
         file_writer.set_as_default()
 
-        # Compute average return variation and scale by importance factor
-        importance_factor = 0.1
-        importance_factor_update = 0.08
-        prev_avg_return = avg_return
-        cumulated_deltas = 0
+        # Store last N average returns
+        last_avg_returns = []
+        last_avg_returns_size = 3
 
         for _ in range(num_iterations):
             # Collect a few steps using collect_policy and save to the replay buffer.
@@ -146,17 +145,13 @@ class C51Agent:
             # Evaluate agent
             if step % evaluation_interval == 0:
                 avg_return = compute_avg_return(eval_env, self.agent.policy, eval_episodes)
-
-                # Compute average return variation and scale by importance factor
-                avg_return_delta = (avg_return - prev_avg_return) / abs(prev_avg_return) if prev_avg_return != 0 else 0
-                avg_return_delta *= importance_factor
-                prev_avg_return = avg_return
-                cumulated_deltas += avg_return_delta # Cumulate deltas
-                print('step = {0}: Average Return = {1:.2f} Average Return Delta = {2:.2f} Importance = {3:.2f}'.format(
-                    step, avg_return, avg_return_delta, importance_factor))
+                print('step = {0}: Average Return = {1:.2f}'.format(step, avg_return))
                 tf.summary.scalar('average return', data=avg_return, step=step)
-                tf.summary.scalar('cumulated deltas', data=cumulated_deltas, step=step)
-                importance_factor = min(importance_factor + importance_factor_update, 1) # Update importance factor
+
+                # Store last N average returns
+                last_avg_returns.append(avg_return)
+                if len(last_avg_returns) > last_avg_returns_size:
+                    last_avg_returns.pop(0)
 
 
             # Change training env
@@ -168,8 +163,8 @@ class C51Agent:
         avg_return = compute_avg_return(eval_env, self.agent.policy, eval_episodes)
 
         return {
-            'final_avg_return': avg_return,
-            'cumulated_deltas': cumulated_deltas
+            'custom_return': np.average(last_avg_returns),
+            'final_avg_return': avg_return
         }
         
 

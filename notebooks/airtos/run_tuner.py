@@ -21,7 +21,7 @@ assert version.parse(tf.__version__).release[0] >= 2, "This notebook requires Te
 
 # Training and configuration parameters
 PARAM_REPLAY_BUFFER_CAPACITY = 100000
-PARAM_BATCH_SIZE = 64
+# PARAM_BATCH_SIZE = 64
 PARAM_NUM_ITERATIONS = 500
 PARAM_COLLECT_STEPS_PER_ITERATION = 200
 
@@ -40,20 +40,21 @@ class AirtosHyperModel(kt.HyperModel):
             sa_layers_list.append(layer_units)
         SA_AGENT_LAYERS = tuple(sa_layers_list)
 
-        # Compute the number of layers for value network
-        v_layers_list = []
-        num_layers = hp.Choice("num_layers_v", [6, 9, 12, 15])
-        layer_units = hp.Int("layer_units_v", min_value=50, max_value=400, step=50)
-        for _ in range(num_layers):
-            v_layers_list.append(layer_units)
-        V_AGENT_LAYERS = tuple(v_layers_list)
+        # Compute the number of layers for value network (not used for now)
+        # v_layers_list = []
+        # num_layers = hp.Choice("num_layers_v", [6, 9, 12, 15])
+        # layer_units = hp.Int("layer_units_v", min_value=50, max_value=400, step=50)
+        # for _ in range(num_layers):
+            # v_layers_list.append(layer_units)
+        # V_AGENT_LAYERS = tuple(v_layers_list)
 
         # Compute optimizer learning rate
-        optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=hp.Choice('learning_rate', [7e-5, 3e-4, 7e-4, 3e-3, 7e-3]))
+        optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=hp.Choice('learning_rate', [7e-6, 3e-5, 7e-5, 3e-4, 7e-4]))
 
         agent = DuelingDQNAgent(
             shared_advantage_layers=SA_AGENT_LAYERS,
-            value_layers=V_AGENT_LAYERS,
+            # value_layers=V_AGENT_LAYERS,
+            value_layers=SA_AGENT_LAYERS,
             optimizer=optimizer,
             replay_buffer_capacity=PARAM_REPLAY_BUFFER_CAPACITY
         )
@@ -66,7 +67,7 @@ class AirtosHyperModel(kt.HyperModel):
 
         LOG_DIR = os.path.join(
             os.path.dirname(__file__),
-            f"{EXECUTION_ID}/trial_{trial.trial_id}"
+            f"train_dudqn/{EXECUTION_ID}/trial_{trial.trial_id}"
         )
 
         final_stats = agent.train_agent(
@@ -89,11 +90,11 @@ class AirtosTunner(kt.BayesianOptimization):
 
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
-    objective=kt.Objective(name='cumulated_deltas', direction='max'),
-    max_trials=200,
+    objective=kt.Objective(name='custom_return', direction='max'),
+    max_trials=100,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
-    directory=os.path.join(os.path.dirname(__file__),EXECUTION_ID),
+    directory=os.path.join(os.path.dirname(__file__), f'train_dudqn/{EXECUTION_ID}'),
     project_name=f'airtos4_{EXECUTION_ID}',
     tuner_id='airtos4_tuner1',
     overwrite=False,
@@ -114,7 +115,7 @@ for hp in best_hps:
     best_values.append(hp.values)
 
 # Save best values to file
-best_values_file = os.path.join(os.path.dirname(__file__), f"{EXECUTION_ID}/best_values.txt")
+best_values_file = os.path.join(os.path.dirname(__file__), f"train_dudqn/{EXECUTION_ID}/best_values.txt")
 with open(best_values_file, 'w') as f:
     f.write(str(best_values))
 

@@ -114,7 +114,7 @@ for hp in best_hps:
     best_values.append(hp.values)
 
 # Save best values to file
-best_values_file = os.path.join(os.path.dirname(__file__), f"{EXECUTION_ID}/best_values.txt")
+best_values_file = os.path.join(os.path.dirname(__file__), f"train_c51/{EXECUTION_ID}/best_values.txt")
 with open(best_values_file, 'w') as f:
     f.write(str(best_values))
 

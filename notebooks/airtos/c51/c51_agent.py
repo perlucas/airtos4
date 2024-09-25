@@ -1,3 +1,5 @@
+import gc
+
 import tensorflow as tf
 from tf_agents.networks import categorical_q_network
 from tf_agents.agents.categorical_dqn import categorical_dqn_agent
@@ -37,6 +39,9 @@ class C51Agent:
         :param max_q_value: float: The maximum Q-value
         :param n_step_update: int: The number of steps to update the target network
         '''
+        self.replay_buffer = None
+        self.buffer_capacity = replay_buffer_capacity
+
         categorical_q_net = CustomCategoricalQNetwork(
             train_env_sample.observation_spec(),
             train_env_sample.action_spec(),
@@ -59,12 +64,6 @@ class C51Agent:
             train_step_counter=train_step_counter)
         
         self.agent.initialize()
-
-        # Create replay buffer
-        self.replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
-            data_spec=self.agent.collect_data_spec,
-            batch_size=train_env_sample.batch_size,
-            max_length=replay_buffer_capacity)
 
 
 
@@ -90,6 +89,12 @@ class C51Agent:
         :param evaluation_interval: int: The interval to evaluate the agent
         :return: float: The final average return of the agent
         '''
+        # Create replay buffer
+        self.replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
+            data_spec=self.agent.collect_data_spec,
+            batch_size=train_env_sample.batch_size,
+            max_length=self.buffer_capacity)
+
         # ====================================== Collect Initial Data ======================================
         # Collect initial data, using random policy
         random_policy = get_random_policy()
@@ -166,6 +171,8 @@ class C51Agent:
         del dataset
         del iterator
         self.replay_buffer.clear()
+        self.replay_buffer = None
+        gc.collect()
 
         return {
             'custom_return': np.average(last_avg_returns),

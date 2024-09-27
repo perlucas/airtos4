@@ -152,7 +152,7 @@ tuner.search()
 
 # Unlock next executions
 status['status'] = 'Finished'
-status['executions_count'] += PARAM_TRIALS_PER_EXECUTION
+status['executions_count'] += 1
 with open(status_file_path, 'w') as f:
     json.dump(status, f)
 

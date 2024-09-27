@@ -50,7 +50,7 @@ class AirtosHyperModel(kt.HyperModel):
 
 
         # Compute learning rate
-        learning_rate=hp.Choice('learning_rate', [7e-5, 3e-4, 7e-4, 3e-3, 7e-3])
+        learning_rate=hp.Choice('learning_rate', [7e-6, 3e-5, 7e-5, 3e-4, 7e-4])
 
         agent = A3CAgent(
             train_env_sample.action_spec(),
@@ -91,7 +91,7 @@ class AirtosTunner(kt.BayesianOptimization):
 
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
-    objective=kt.Objective(name='cumulated_deltas', direction='max'),
+    objective=kt.Objective(name='custom_return', direction='max'),
     max_trials=100,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,

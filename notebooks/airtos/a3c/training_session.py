@@ -2,6 +2,7 @@ from queue import Queue
 import threading
 
 import tensorflow as tf
+import numpy as np
 
 from .a3c_agent import A3CAgent
 from .training_worker import TrainingWorker
@@ -38,27 +39,27 @@ class TrainingSession:
         # Delete all workers to encourage garbage collection
         del workers
 
-        print(stats_collector)
-
         # Log stats and metrics
         file_writer = tf.summary.create_file_writer(f'{log_dir}/metrics')
         file_writer.set_as_default()
 
         stats_collector.sort(key=lambda x: x.get('episode'))
 
-        cumulated_deltas = 0
-        prev_avg_return = 0
+        last_n_avg_returns = []
+        last_n_avg_returns_len = 4
         final_avg_return = 0
         for stats in stats_collector:
             step = stats.get('episode')
             avg_return = stats.get('avg_return')
             final_avg_return = avg_return
-            cumulated_deltas += (avg_return - prev_avg_return) / abs(prev_avg_return) if prev_avg_return != 0 else 0
-            prev_avg_return = avg_return
+
+            # Compute last n average returns
+            last_n_avg_returns.append(avg_return)
+            if len(last_n_avg_returns) > last_n_avg_returns_len:
+                last_n_avg_returns.pop(0)
 
             # Log metrics
             tf.summary.scalar('average return', data=avg_return, step=step)
-            tf.summary.scalar('cumulated deltas', data=cumulated_deltas, step=step)
 
         # Close file writer
         file_writer.close()
@@ -66,5 +67,5 @@ class TrainingSession:
         print('All workers finished!')
         return {
             'final_avg_return': final_avg_return,
-            'cumulated_deltas': cumulated_deltas
+            'custom_return': np.average(last_n_avg_returns)
         }

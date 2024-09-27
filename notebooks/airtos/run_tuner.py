@@ -1,6 +1,7 @@
 import os
 from packaging import version
 from datetime import datetime
+import json
 
 import tensorflow as tf
 import keras_tuner as kt
@@ -20,6 +21,29 @@ print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2, "This notebook requires TensorFlow 2.0 or above."
 
 
+# EXECUTION_ID = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+EXECUTION_ID = '2024-09-27__latest'
+
+
+# Abort if there's a current execution running
+# Check the status JSON file
+status_file_path = os.path.join(
+    os.path.dirname(__file__),
+    f"train_c51/{EXECUTION_ID}/status.json")
+
+executions_count = 0
+
+if os.path.exists(status_file_path):
+    with open(status_file_path, 'r') as f:
+        status = json.load(f)
+    executions_count = int(status.get('executions_count', 0))
+    if status['status'] == 'Running':
+        print("An execution is already running. Aborting...")
+        exit(1)
+
+
+
+
 # Training and configuration parameters
 PARAM_NUM_ATOMS = 51
 PARAM_MIN_Q_VALUE = -1000
@@ -30,8 +54,6 @@ PARAM_REPLAY_BUFFER_CAPACITY = 100000
 PARAM_NUM_ITERATIONS = 500
 PARAM_COLLECT_STEPS_PER_ITERATION = 200
 
-
-EXECUTION_ID = datetime.now().strftime('%Y-%m-%d_%H%M%S')
 
 
 class AirtosHyperModel(kt.HyperModel):
@@ -90,7 +112,7 @@ class AirtosTunner(kt.BayesianOptimization):
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
     objective=kt.Objective(name='custom_return', direction='max'),
-    max_trials=100,
+    max_trials=3,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
     directory=os.path.join(os.path.dirname(__file__), f'train_c51/{EXECUTION_ID}'),
@@ -102,9 +124,35 @@ tuner = AirtosTunner(
     tune_new_entries=True
 )
 
+
+# Update the current status file
+status = {
+    'status': 'Running',
+    'executions_count': executions_count,
+    'execution_id': EXECUTION_ID
+}
+with open(status_file_path, 'w') as f:
+    json.dump(status, f)
+
+
+tuner.reload()
+
 tuner.search_space_summary(extended=True)
 
 tuner.search()
+
+# Unlock next executions
+status['status'] = 'Finished'
+status['executions_count'] += 3
+with open(status_file_path, 'w') as f:
+    json.dump(status, f)
+
+
+# Exit if more executions are needed
+# Exit process to clean up memory
+if status['executions_count'] < 50:
+    exit(0)
+
 
 # Get best hyperparameters
 best_hps = tuner.get_best_hyperparameters(num_trials=40)

@@ -53,7 +53,8 @@ PARAM_REPLAY_BUFFER_CAPACITY = 100000
 # PARAM_BATCH_SIZE = 64
 PARAM_NUM_ITERATIONS = 500
 PARAM_COLLECT_STEPS_PER_ITERATION = 200
-
+PARAM_MAX_TRIALS = 50
+PARAM_TRIALS_PER_EXECUTION = 3
 
 
 class AirtosHyperModel(kt.HyperModel):
@@ -107,12 +108,15 @@ class AirtosTunner(kt.BayesianOptimization):
         hp = trial.hyperparameters
         model = self.hypermodel.build(hp)
         return self.hypermodel.run(hp, model, trial=trial, *args, **kwargs)
-    
+
+
+# total trials to run = already run trials + trials per execution => this makes the trial to only run the remaining trials
+trials_to_run = min(PARAM_TRIALS_PER_EXECUTION * executions_count + PARAM_TRIALS_PER_EXECUTION, PARAM_MAX_TRIALS)
 
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
     objective=kt.Objective(name='custom_return', direction='max'),
-    max_trials=3,
+    max_trials=trials_to_run,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
     directory=os.path.join(os.path.dirname(__file__), f'train_c51/{EXECUTION_ID}'),
@@ -123,6 +127,11 @@ tuner = AirtosTunner(
     allow_new_entries=True,
     tune_new_entries=True
 )
+
+# Abort if there are no more trials to run
+if trials_to_run >= PARAM_MAX_TRIALS:
+    print("No more trials to run. Aborting...")
+    exit(0)
 
 
 # Update the current status file
@@ -143,7 +152,7 @@ tuner.search()
 
 # Unlock next executions
 status['status'] = 'Finished'
-status['executions_count'] += 3
+status['executions_count'] += PARAM_TRIALS_PER_EXECUTION
 with open(status_file_path, 'w') as f:
     json.dump(status, f)
 

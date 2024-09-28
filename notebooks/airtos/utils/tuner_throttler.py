@@ -38,7 +38,19 @@ class TunnerThrottler:
         return self._status['status']
 
     def is_running(self):
-        return self._current_status() == _STATUS_RUNNING
+        # is not running if status != Running
+        if self._current_status() != _STATUS_RUNNING:
+            return False
+        last_updated_at = datetime.strptime(self._status['last_updated'], '%Y-%m-%d %H:%M:%S') if self._status['last_updated'] else None
+
+        # If the last update was never set, and status = Running, consider it as running
+        if last_updated_at is None:
+            return True
+        
+        # If the last update was more than 5 hours ago, consider it as no longer running
+        if (datetime.now() - last_updated_at).total_seconds() > 5 * 60 * 60:
+            return False
+        return True
     
     def set_running(self):
         self._status['status'] = _STATUS_RUNNING

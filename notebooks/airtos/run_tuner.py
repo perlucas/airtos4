@@ -1,13 +1,11 @@
 import os
 from packaging import version
-from datetime import datetime
-import json
 
 import tensorflow as tf
 import keras_tuner as kt
 
 from c51.c51_agent import C51Agent
-
+from utils.tuner_throttler import TunnerThrottler
 
 
 
@@ -21,26 +19,25 @@ print("TensorFlow version: ", tf.__version__)
 assert version.parse(tf.__version__).release[0] >= 2, "This notebook requires TensorFlow 2.0 or above."
 
 
-# EXECUTION_ID = datetime.now().strftime('%Y-%m-%d_%H%M%S')
 EXECUTION_ID = '2024-09-27__latest'
+PARAM_MAX_TRIALS = 100
+PARAM_TRIALS_PER_EXECUTION = 3
+
+# Load the tuner throttler to check if there's a current execution running
+tuner_throttler = TunnerThrottler(
+    status_file_path=os.path.join(
+        os.path.dirname(__file__),
+        f"train_c51/{EXECUTION_ID}/status.json"),
+    trials_per_execution=PARAM_TRIALS_PER_EXECUTION,
+    execution_id=EXECUTION_ID
+)
+tuner_throttler.load()
 
 
 # Abort if there's a current execution running
-# Check the status JSON file
-status_file_path = os.path.join(
-    os.path.dirname(__file__),
-    f"train_c51/{EXECUTION_ID}/status.json")
-
-executions_count = 0
-
-if os.path.exists(status_file_path):
-    with open(status_file_path, 'r') as f:
-        status = json.load(f)
-    executions_count = int(status.get('executions_count', 0))
-    if status['status'] == 'Running':
-        print("An execution is already running. Aborting...")
-        exit(1)
-
+if tuner_throttler.is_running():
+    print("An execution is already running. Aborting...")
+    exit(1)
 
 
 
@@ -53,8 +50,7 @@ PARAM_REPLAY_BUFFER_CAPACITY = 100000
 # PARAM_BATCH_SIZE = 64
 PARAM_NUM_ITERATIONS = 500
 PARAM_COLLECT_STEPS_PER_ITERATION = 200
-PARAM_MAX_TRIALS = 50
-PARAM_TRIALS_PER_EXECUTION = 3
+
 
 
 class AirtosHyperModel(kt.HyperModel):
@@ -110,9 +106,22 @@ class AirtosTunner(kt.BayesianOptimization):
         return self.hypermodel.run(hp, model, trial=trial, *args, **kwargs)
 
 
-# total trials to run = already run trials + trials per execution => this makes the trial to only run the remaining trials
-trials_to_run = min(PARAM_TRIALS_PER_EXECUTION * executions_count + PARAM_TRIALS_PER_EXECUTION, PARAM_MAX_TRIALS)
+# total trials to run = already run trials + trials per execution => this makes the tuner to only run the remaining trials
+# once it loads the tuner's status from the disk, it'll see how many trials have already been run
+# and then it'll calculate the remaining trials to run. So only PARAM_TRIALS_PER_EXECUTION trials will be run
+trials_to_run = min(tuner_throttler.executed_trials() + PARAM_TRIALS_PER_EXECUTION, PARAM_MAX_TRIALS)
 
+# Abort if there are no more trials to run
+if trials_to_run >= PARAM_MAX_TRIALS:
+    print("No more trials to run. Aborting...")
+    exit(0)
+
+
+# Update the current status file
+tuner_throttler.set_running()
+tuner_throttler.save()
+
+# Create the tuner
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
     objective=kt.Objective(name='custom_return', direction='max'),
@@ -128,41 +137,25 @@ tuner = AirtosTunner(
     tune_new_entries=True
 )
 
-# Abort if there are no more trials to run
-if trials_to_run >= PARAM_MAX_TRIALS:
-    print("No more trials to run. Aborting...")
-    exit(0)
-
-
-# Update the current status file
-status = {
-    'status': 'Running',
-    'executions_count': executions_count,
-    'execution_id': EXECUTION_ID
-}
-with open(status_file_path, 'w') as f:
-    json.dump(status, f)
-
-
-tuner.reload()
+# Reload the tuner if it has already been executed
+if tuner_throttler.executions_count() > 0:
+    tuner.reload()
 
 tuner.search_space_summary(extended=True)
 
 tuner.search()
 
 # Unlock next executions
-status['status'] = 'Finished'
-status['executions_count'] += 1
-with open(status_file_path, 'w') as f:
-    json.dump(status, f)
+tuner_throttler.set_finished()
+tuner_throttler.save()
 
 
 # Exit if more executions are needed
-# Exit process to clean up memory
-if status['executions_count'] < 50:
+if tuner_throttler.executed_trials() < PARAM_MAX_TRIALS:
     exit(0)
 
 
+# Reach here if all trials have been executed
 # Get best hyperparameters
 best_hps = tuner.get_best_hyperparameters(num_trials=40)
 best_values = []

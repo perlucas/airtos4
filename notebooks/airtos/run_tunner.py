@@ -8,7 +8,7 @@ import keras_tuner as kt
 from a3c.a3c_agent import A3CAgent
 from a3c.training_session import TrainingSession
 from utils.envs import train_env_sample
-
+from utils.tuner_throttler import TunnerThrottler
 
 
 
@@ -26,7 +26,24 @@ PARAM_NUM_ITERATIONS = 500
 PARAM_EPISODES_PER_JOB = 10
 
 
-EXECUTION_ID = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+EXECUTION_ID = '2024-09-28__latest'
+PARAM_MAX_TRIALS = 100
+PARAM_TRIALS_PER_EXECUTION = 3
+
+# Load the tuner throttler to check if there's a current execution running
+tuner_throttler = TunnerThrottler(
+    status_file_path=os.path.join(
+        os.path.dirname(__file__),
+        f"{EXECUTION_ID}/status.json"),
+    trials_per_execution=PARAM_TRIALS_PER_EXECUTION,
+    execution_id=EXECUTION_ID
+)
+tuner_throttler.load()
+
+# Abort if there's a current execution running
+if tuner_throttler.is_running():
+    print("An execution is already running. Aborting...")
+    exit(1)
 
 
 class AirtosHyperModel(kt.HyperModel):
@@ -87,12 +104,30 @@ class AirtosTunner(kt.BayesianOptimization):
         hp = trial.hyperparameters
         model = self.hypermodel.build(hp)
         return self.hypermodel.run(hp, model, trial=trial, *args, **kwargs)
-    
+
+
+# total trials to run = already run trials + trials per execution => this makes the tuner to only run the remaining trials
+# once it loads the tuner's status from the disk, it'll see how many trials have already been run
+# and then it'll calculate the remaining trials to run. So only PARAM_TRIALS_PER_EXECUTION trials will be run
+trials_to_run = min(
+    tuner_throttler.executed_trials() + PARAM_TRIALS_PER_EXECUTION,
+    PARAM_MAX_TRIALS
+)
+
+# Abort if there are no more trials to run
+if trials_to_run >= PARAM_MAX_TRIALS:
+    print("No more trials to run. Aborting...")
+    exit(0)
+
+# Set the tuner as running
+tuner_throttler.set_running()
+tuner_throttler.save()
+
 
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
     objective=kt.Objective(name='custom_return', direction='max'),
-    max_trials=100,
+    max_trials=trials_to_run,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
     directory=os.path.join(os.path.dirname(__file__),EXECUTION_ID),
@@ -104,10 +139,23 @@ tuner = AirtosTunner(
     tune_new_entries=True
 )
 
+# Reload the tuner if there are already executions
+if tuner_throttler.executions_count() > 0:
+    tuner.reload()
+
 tuner.search_space_summary(extended=True)
 
 tuner.search()
 
+# Unlock next executions
+tuner_throttler.set_finished()
+tuner_throttler.save()
+
+# Exit if more executions are needed
+if tuner_throttler.executed_trials() < PARAM_MAX_TRIALS:
+    exit(0)
+
+# Reach here if all trials have been executed
 # Get best hyperparameters
 best_hps = tuner.get_best_hyperparameters(num_trials=40)
 best_values = []

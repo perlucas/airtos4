@@ -125,7 +125,7 @@ tuner_throttler.save()
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
     objective=kt.Objective(name='custom_return', direction='max'),
-    max_trials=100,
+    max_trials=trials_to_run,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
     directory=os.path.join(os.path.dirname(__file__), f'train_dudqn/{EXECUTION_ID}'),

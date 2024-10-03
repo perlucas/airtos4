@@ -74,10 +74,7 @@ class TradingEnv(gym.Env):
         )
 
         # Define action space
-        self.action_space = spaces.Discrete(
-            n=_MAX_ACTION - _MIN_ACTION + 1,
-            start=_MIN_ACTION,
-        )
+        self.action_space = spaces.Discrete(_MAX_ACTION - _MIN_ACTION + 1)
 
         # Values needed for initializing episodes
 

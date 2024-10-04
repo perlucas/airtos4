@@ -9,6 +9,6 @@ RUN apt install -y cmake libomp-dev
 
 RUN pip install --upgrade pip
 RUN pip install git+https://github.com/carlosluis/stable-baselines3@fix_tests
-RUN pip install gymnasium "numpy<2.0" pandas pandas-ta matplotlib tensorflow scipy scikit-learn keras-tuner
+RUN pip install gymnasium "numpy<2.0" pandas pandas-ta matplotlib "tensorflow<=2.16" scipy scikit-learn keras-tuner
 
 CMD ["python", "run_sb3.py"]

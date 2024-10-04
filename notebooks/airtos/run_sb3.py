@@ -7,6 +7,7 @@ sys.modules["gym"] = gymnasium
 
 import os
 from datetime import datetime
+import threading
 
 from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
@@ -29,21 +30,26 @@ PARAM_INITIAL_COLLECT_STEPS = 1000
 PARAM_REPLAY_BUFFER_CAPACITY = 100000
 PARAM_LOG_INTERVAL_EPISODES = 10
 PARAM_EVAL_INTERVAL_EPISODES = 25
-PARAM_SWITCH_ENV_INTERVAL = 5
+PARAM_SWITCH_ENV_INTERVAL = 5 * PARAM_COLLECT_STEPS_PER_ITERATION
 
 # =============================== Callbacks ===============================================
 class EvaluateAndLogCallback(BaseCallback):
     '''Custom callback to evaluate the policy and log the average return mean'''
 
-    def __init__(self, eval_env, verbose=0):
+    def __init__(self, eval_env, log_interval, eval_interval, verbose=0):
         super().__init__(verbose)
         self.eval_env = eval_env
-        self.episode = 0
+        self.eval_interval = eval_interval
+        self.log_interval = log_interval
         self.last_n_avg_returns = []
         self.last_n_avg_returns_len = 4
 
-    def _on_training_end(self) -> None:
-        if self.episode % PARAM_EVAL_INTERVAL_EPISODES != 0:
+    def _on_step(self) -> bool:
+
+        if self.n_calls % self.log_interval == 0:
+            print(f'Step {self.n_calls}')
+        
+        if self.n_calls % self.eval_interval != 0:
             return True
 
         # Evaluate policy and log avg_return
@@ -55,6 +61,7 @@ class EvaluateAndLogCallback(BaseCallback):
             obs, _reward, done, _truncated, info = self.eval_env.step(action)
             total_reward += _reward
         print(f'Step {self.n_calls} - Total reward: {total_reward}')
+        print(f'Number of active threads: {threading.active_count()}')
 
         # Log the average return in the buffer
         self.last_n_avg_returns.append(total_reward)
@@ -62,6 +69,9 @@ class EvaluateAndLogCallback(BaseCallback):
             self.last_n_avg_returns.pop(0)
         return True
     
+    def _on_training_end(self) -> None:
+        return True
+
     def get_avg_return(self):
         return sum(self.last_n_avg_returns) / len(self.last_n_avg_returns)
     
@@ -71,11 +81,40 @@ class EvaluateAndLogCallback(BaseCallback):
     def _on_rollout_start(self) -> None:
         pass
 
-    def _on_step(self) -> bool:
-        return True
-
     def _on_rollout_end(self) -> None:
         pass
+
+
+class SwitchEnvironmentCallback(BaseCallback):
+    '''Custom callback to switch the training environment'''
+
+    def __init__(self, interval, verbose=0):
+        super().__init__(verbose)
+        self.interval = interval
+        self.switch_env_on_rollout_end = False
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.interval == 0:
+            self.switch_env_on_rollout_end = True
+        return True
+    
+    def _on_training_end(self) -> None:
+        return True
+    
+    def _on_training_start(self) -> None:
+        pass
+
+    def _on_rollout_start(self) -> None:
+        pass
+
+    def _on_rollout_end(self) -> None:
+        if not self.switch_env_on_rollout_end:
+            return None
+
+        # Switch training environment
+        env = get_random_train_env()
+        self.model.set_env(env, force_reset=True)
+        self.switch_env_on_rollout_end = False
 
 # =============================== Keras Tuner ===============================================
 class AirtosHyperModel(kt.HyperModel):
@@ -101,18 +140,24 @@ class AirtosHyperModel(kt.HyperModel):
             policy_kwargs=policy_kwargs,
             buffer_size=PARAM_REPLAY_BUFFER_CAPACITY,
             learning_starts=PARAM_INITIAL_COLLECT_STEPS,
-            gamma=1.0,
+            gamma=0.99,
             batch_size=hp.Choice('batch_size', [32, 64, 128]),
+            train_freq=(1, 'episode'),
             tensorboard_log=LOG_DIR)
         return model
 
 
     def run(self, hp, model, trial, *args, **kwargs):
-        agent = model
         
         # Will use this custom callback to compute metric for Tuner
-        custom_evaluate_callback = EvaluateAndLogCallback(eval_env)
-        custom_evaluate_callback.episode = 0
+        custom_evaluate_callback = EvaluateAndLogCallback(
+            eval_env,
+            eval_interval=PARAM_EVAL_INTERVAL_EPISODES * PARAM_COLLECT_STEPS_PER_ITERATION,
+            log_interval=PARAM_LOG_INTERVAL_EPISODES * PARAM_COLLECT_STEPS_PER_ITERATION)
+
+        # Switch environments callback
+        # Deprecate this? it's throwing an error because of the monitor
+        switch_env_callback = SwitchEnvironmentCallback(interval=PARAM_SWITCH_ENV_INTERVAL)
 
         # SB3 callback to evaluate the policy and log in TB
         eval_callback = EvalCallback(
@@ -120,23 +165,11 @@ class AirtosHyperModel(kt.HyperModel):
             n_eval_episodes=2,
             eval_freq=PARAM_EVAL_INTERVAL_EPISODES * PARAM_COLLECT_STEPS_PER_ITERATION)
 
-        for episode in range(PARAM_NUM_ITERATIONS):
-            # Train episode
-            agent.learn(
-                total_timesteps=PARAM_COLLECT_STEPS_PER_ITERATION,
-                reset_num_timesteps=False,
-                callback=[custom_evaluate_callback, eval_callback],
-                tb_log_name=f'trial_{trial.trial_id}')
-            
-            if episode % PARAM_LOG_INTERVAL_EPISODES == 0:
-                print(f'Episode {episode} done!')
-
-            # Switch training environment
-            if episode % PARAM_SWITCH_ENV_INTERVAL == 0:
-                env = get_random_train_env()
-                agent.set_env(env)
-            
-            custom_evaluate_callback.episode += 1
+        model.learn(
+            total_timesteps=PARAM_COLLECT_STEPS_PER_ITERATION * PARAM_NUM_ITERATIONS,
+            reset_num_timesteps=False,
+            callback=[custom_evaluate_callback, eval_callback],
+            tb_log_name=f'trial_{trial.trial_id}')
 
         return { 'avg_return': custom_evaluate_callback.get_avg_return() }
 
@@ -151,7 +184,7 @@ class AirtosTunner(kt.BayesianOptimization):
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
     objective=kt.Objective(name='avg_return', direction='max'),
-    max_trials=3,
+    max_trials=50,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
     directory=os.path.join(os.path.dirname(__file__), EXECUTION_ID),

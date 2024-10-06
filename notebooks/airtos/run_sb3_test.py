@@ -9,11 +9,11 @@ import os
 from datetime import datetime
 import threading
 
-from stable_baselines3 import DQN, PPO
+from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 import keras_tuner as kt
 
-from utils.envs.sb3 import eval_env, get_random_train_env
+from utils.envs.sb3 import eval_env, get_random_train_env, train_envs
 
 
 # =============================== General parameters ===============================================
@@ -80,12 +80,27 @@ class EvaluateAndLogCallback(BaseCallback):
         obs, info = self.eval_env.reset()
         done = False
         total_reward = 0
+        actions_frequency = {
+            0: 0,
+            1: 0,
+            2: 0,
+            3: 0,
+            4: 0,
+            5: 0,
+            6: 0
+        }
         while not done:
             action, _states = self.model.predict(obs, deterministic=True)
+            actions_frequency[int(action)] += 1
             obs, _reward, done, _truncated, info = self.eval_env.step(action)
             total_reward += _reward
         print(f'Step {self.n_calls} - Total reward: {total_reward}')
         print(f'Number of active threads: {threading.active_count()}')
+        
+        # Append to CSV
+        with open(os.path.join(LOG_DIR, 'actions_frequency.csv'), 'a') as f:
+            csv_line = ','.join([str(action) for action in actions_frequency.values()])
+            f.write(f'{csv_line}\n')
 
         # Log the average return in the buffer
         self.last_n_avg_returns.append(total_reward)
@@ -224,28 +239,29 @@ def linear_schedule(initial_value: float):
 
 
 # Create model
-policy_kwargs = dict(net_arch=[50, 100, 100])
+policy_kwargs = dict(net_arch=[100, 100, 100, 100, 100, 100, 100])
 env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
-# model = DQN(
-#     'MlpPolicy',
-#     env,
-#     learning_rate=linear_schedule(0.05),
-#     policy_kwargs=policy_kwargs,
-#     buffer_size=PARAM_REPLAY_BUFFER_CAPACITY,
-#     learning_starts=PARAM_INITIAL_COLLECT_STEPS,
-#     gamma=0.99,
-#     exploration_fraction=0.3,
-#     batch_size=64,
-#     train_freq=(3, 'episode'),
-#     tensorboard_log=LOG_DIR)
-model = PPO(
+
+model = DQN(
     'MlpPolicy',
     env,
-    learning_rate=linear_schedule(0.001),
+    learning_rate=5e-4,  #linear_schedule(0.05),
     policy_kwargs=policy_kwargs,
+    buffer_size=PARAM_REPLAY_BUFFER_CAPACITY,
+    learning_starts=PARAM_INITIAL_COLLECT_STEPS,
     gamma=0.99,
-    batch_size=64,
+    exploration_fraction=0.5,
+    batch_size=128,
+    train_freq=(100, 'step'),
     tensorboard_log=LOG_DIR)
+# model = PPO(
+#     'MlpPolicy',
+#     env,
+#     learning_rate=linear_schedule(0.001),
+#     policy_kwargs=policy_kwargs,
+#     gamma=0.99,
+#     batch_size=64,
+#     tensorboard_log=LOG_DIR)
 
 
 # Will use this custom callback to compute metric for Tuner
@@ -263,8 +279,8 @@ eval_callback = EvalCallback(
 model.learn(
     total_timesteps=PARAM_COLLECT_STEPS_PER_ITERATION * 5000,
     reset_num_timesteps=False,
-    callback=[eval_callback],
-    tb_log_name=f'test_20_ppo')
+    callback=[eval_callback, custom_evaluate_callback],
+    tb_log_name=f'test_34')
 
 
 

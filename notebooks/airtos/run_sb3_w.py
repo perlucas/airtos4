@@ -24,7 +24,7 @@ LOG_DIR = os.path.join(
     EXECUTION_ID
 )
 
-PARAM_NUM_ITERATIONS = 1000
+PARAM_NUM_ITERATIONS = 3000
 PARAM_COLLECT_STEPS_PER_ITERATION = 250
 PARAM_INITIAL_COLLECT_STEPS = 1000
 PARAM_REPLAY_BUFFER_CAPACITY = 100000
@@ -113,14 +113,14 @@ class AirtosHyperModel(kt.HyperModel):
     def build(self, hp):
         # Compute the number of layers for the DQN agent
         layers_list = []
-        num_layers = hp.Choice("num_layers", [6, 9, 12, 15])
+        num_layers = hp.Choice("num_layers", [2, 3, 4, 6, 9, 12, 15])
         layer_units = hp.Int("layer_units", min_value=50, max_value=400, step=50)
         for _ in range(num_layers):
             layers_list.append(layer_units)
         policy_kwargs = dict(net_arch=layers_list)
 
         # Compute optimizer learning rate
-        learning_rate = hp.Choice('learning_rate', [7e-6, 3e-5, 7e-5, 3e-4, 7e-4])
+        learning_rate = hp.Choice('learning_rate', [3e-6, 7e-6, 3e-5, 7e-5, 3e-4, 7e-4])
 
         # Create model
         env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
@@ -133,7 +133,8 @@ class AirtosHyperModel(kt.HyperModel):
             learning_starts=PARAM_INITIAL_COLLECT_STEPS,
             gamma=0.99,
             batch_size=hp.Choice('batch_size', [32, 64, 128]),
-            train_freq=(1, 'episode'),
+            exploration_fraction=0.5,
+            train_freq=(100, 'step'),
             tensorboard_log=LOG_DIR)
         return model
 
@@ -171,7 +172,7 @@ class AirtosTunner(kt.BayesianOptimization):
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
     objective=kt.Objective(name='avg_return', direction='max'),
-    max_trials=100,
+    max_trials=120,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
     directory=os.path.join(os.path.dirname(__file__), EXECUTION_ID),

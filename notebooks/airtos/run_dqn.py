@@ -83,14 +83,14 @@ class AirtosHyperModel(kt.HyperModel):
     def build(self, hp):
         # Compute the number of layers for the DQN agent
         layers_list = []
-        num_layers = hp.Choice("num_layers", [6, 9, 12, 15])
+        num_layers = hp.Choice("num_layers", [2, 3, 4, 6, 9, 12, 15])
         layer_units = hp.Int("layer_units", min_value=50, max_value=400, step=50)
         for _ in range(num_layers):
             layers_list.append(layer_units)
         policy_kwargs = dict(net_arch=layers_list)
 
         # Compute optimizer learning rate
-        learning_rate = hp.Choice('learning_rate', [7e-6, 3e-5, 7e-5, 3e-4, 7e-4])
+        learning_rate = hp.Choice('learning_rate', [3e-6, 7e-6, 3e-5, 7e-5, 3e-4, 7e-4])
 
         # Create model
         env = train_envs[0] # Start with the first environment
@@ -102,6 +102,8 @@ class AirtosHyperModel(kt.HyperModel):
             buffer_size=PARAM_REPLAY_BUFFER_CAPACITY,
             learning_starts=PARAM_INITIAL_COLLECT_STEPS,
             gamma=0.99,
+            exploration_fraction=0.5,
+            train_freq=(100, 'step'),
             batch_size=hp.Choice('batch_size', [32, 64, 128]),
             tensorboard_log=LOG_DIR)
         return model

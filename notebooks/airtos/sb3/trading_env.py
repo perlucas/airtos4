@@ -86,6 +86,8 @@ class TradingEnv(gym.Env):
         self._current_tick = None
         self._history = None
         self._profit = None
+        self._punishment_on_none = 2
+        self._current_punishment = 0
         self._session = TradingSession(fee = 2)
 
 
@@ -112,6 +114,7 @@ class TradingEnv(gym.Env):
         self._history = []
         self._current_tick = self._start_tick
         self._profit = 0
+        self._current_punishment = 0
         self._session.reset()
 
         observation = self._get_observation()
@@ -127,14 +130,19 @@ class TradingEnv(gym.Env):
         # Compute step reward and add it to profit
         step_reward = 0
         action, num_shares = extract_action_and_num_shares(action_code)
+
+        self._current_punishment += 1
         
         if action == 'buy':
             step_reward = self._session.open_long(current_price, num_shares)
+            self._current_punishment = 0
         elif action == 'sell':
             step_reward = self._session.open_short(current_price, num_shares)
+            self._current_punishment = 0
 
         # Add daily punishment (disabled)
-        # step_reward -= 10
+        punishment = self._current_punishment * self._punishment_on_none
+        step_reward -= punishment
         
         self._profit += step_reward
 

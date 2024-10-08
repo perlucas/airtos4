@@ -90,7 +90,7 @@ class AirtosHyperModel(kt.HyperModel):
         policy_kwargs = dict(net_arch=layers_list)
 
         # Compute optimizer learning rate
-        learning_rate = hp.Choice('learning_rate', [3e-6, 7e-6, 3e-5, 7e-5, 3e-4, 7e-4])
+        learning_rate = hp.Float('learning_rate', min_value=1e-7, max_value=1e-2, sampling='log')
 
         # Create model
         env = train_envs[0] # Start with the first environment
@@ -160,6 +160,7 @@ tuner = AirtosTunner(
     project_name=f'airtos4_{EXECUTION_ID}',
     tuner_id='airtos4_tuner1',
     overwrite=False,
+    beta=10,
     executions_per_trial=1,
     allow_new_entries=True,
     tune_new_entries=True

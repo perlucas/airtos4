@@ -9,12 +9,11 @@ import os
 from datetime import datetime
 import threading
 
-# from stable_baselines3 import DQN
 from sb3_contrib import QRDQN
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 import keras_tuner as kt
 
-from utils.envs.sb3 import eval_env, get_random_train_env, train_envs
+from utils.envs.sb3 import eval_env, get_random_train_env
 
 
 # =============================== General parameters ===============================================
@@ -22,11 +21,10 @@ EXECUTION_ID = datetime.now().strftime('%Y-%m-%d_%H%M%S')
 
 LOG_DIR = os.path.join(
     os.path.dirname(__file__),
-    # '2024-10-05'
     EXECUTION_ID
 )
 
-PARAM_NUM_ITERATIONS = 1000
+PARAM_NUM_ITERATIONS = 3000
 PARAM_COLLECT_STEPS_PER_ITERATION = 250
 PARAM_INITIAL_COLLECT_STEPS = 1000
 PARAM_REPLAY_BUFFER_CAPACITY = 100000
@@ -81,27 +79,12 @@ class EvaluateAndLogCallback(BaseCallback):
         obs, info = self.eval_env.reset()
         done = False
         total_reward = 0
-        actions_frequency = {
-            0: 0,
-            1: 0,
-            2: 0,
-            3: 0,
-            4: 0,
-            5: 0,
-            6: 0
-        }
         while not done:
             action, _states = self.model.predict(obs, deterministic=True)
-            actions_frequency[int(action)] += 1
             obs, _reward, done, _truncated, info = self.eval_env.step(action)
             total_reward += _reward
         print(f'Step {self.n_calls} - Total reward: {total_reward}')
         print(f'Number of active threads: {threading.active_count()}')
-        
-        # Append to CSV
-        with open(os.path.join(LOG_DIR, 'actions_frequency.csv'), 'a') as f:
-            csv_line = ','.join([str(action) for action in actions_frequency.values()])
-            f.write(f'{csv_line}\n')
 
         # Log the average return in the buffer
         self.last_n_avg_returns.append(total_reward)
@@ -130,14 +113,14 @@ class AirtosHyperModel(kt.HyperModel):
     def build(self, hp):
         # Compute the number of layers for the DQN agent
         layers_list = []
-        num_layers = hp.Choice("num_layers", [6, 9, 12, 15])
+        num_layers = hp.Choice("num_layers", [2, 3, 4, 6, 9, 12, 15])
         layer_units = hp.Int("layer_units", min_value=50, max_value=400, step=50)
         for _ in range(num_layers):
             layers_list.append(layer_units)
         policy_kwargs = dict(net_arch=layers_list)
 
         # Compute optimizer learning rate
-        learning_rate = hp.Choice('learning_rate', [7e-6, 3e-5, 7e-5, 3e-4, 7e-4])
+        learning_rate = hp.Float('learning_rate', min_value=1e-7, max_value=1e-2, sampling='log')
 
         # Create model
         env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
@@ -150,7 +133,8 @@ class AirtosHyperModel(kt.HyperModel):
             learning_starts=PARAM_INITIAL_COLLECT_STEPS,
             gamma=0.99,
             batch_size=hp.Choice('batch_size', [32, 64, 128]),
-            train_freq=(1, 'episode'),
+            exploration_fraction=0.5,
+            train_freq=(100, 'step'),
             tensorboard_log=LOG_DIR)
         return model
 
@@ -185,105 +169,37 @@ class AirtosTunner(kt.BayesianOptimization):
         return self.hypermodel.run(hp, model, trial=trial, *args, **kwargs)
     
 
-# tuner = AirtosTunner(
-#     hypermodel=AirtosHyperModel(name='airtos4'),
-#     objective=kt.Objective(name='avg_return', direction='max'),
-#     max_trials=100,
-#     max_retries_per_trial=0,
-#     max_consecutive_failed_trials=3,
-#     directory=os.path.join(os.path.dirname(__file__), EXECUTION_ID),
-#     project_name=f'airtos4_{EXECUTION_ID}',
-#     tuner_id='airtos4_tuner1',
-#     overwrite=False,
-#     executions_per_trial=1,
-#     allow_new_entries=True,
-#     tune_new_entries=True
-# )
+tuner = AirtosTunner(
+    hypermodel=AirtosHyperModel(name='airtos4'),
+    objective=kt.Objective(name='avg_return', direction='max'),
+    max_trials=100,
+    max_retries_per_trial=0,
+    max_consecutive_failed_trials=3,
+    directory=os.path.join(os.path.dirname(__file__), EXECUTION_ID),
+    project_name=f'airtos4_{EXECUTION_ID}',
+    tuner_id='airtos4_tuner1',
+    beta=10,
+    overwrite=False,
+    executions_per_trial=1,
+    allow_new_entries=True,
+    tune_new_entries=True
+)
 
 
-# tuner.search_space_summary(extended=True)
+tuner.search_space_summary(extended=True)
 
-# tuner.search()
+tuner.search()
 
-# # Get best hyperparameters
-# best_hps = tuner.get_best_hyperparameters(num_trials=40)
-# best_values = []
-# for hp in best_hps:
-#     print(hp.values)
-#     best_values.append(hp.values)
+# Get best hyperparameters
+best_hps = tuner.get_best_hyperparameters(num_trials=40)
+best_values = []
+for hp in best_hps:
+    print(hp.values)
+    best_values.append(hp.values)
 
-# # Save best values to file
-# best_values_file = os.path.join(os.path.dirname(__file__), f"{EXECUTION_ID}/best_values.txt")
-# with open(best_values_file, 'w') as f:
-#     f.write(str(best_values))
-
-
-
-def linear_schedule(initial_value: float):
-    """
-    Linear learning rate schedule.
-
-    :param initial_value: Initial learning rate.
-    :return: schedule that computes
-      current learning rate depending on remaining progress
-    """
-    def func(progress_remaining: float) -> float:
-        """
-        Progress will decrease from 1 (beginning) to 0.
-
-        :param progress_remaining:
-        :return: current learning rate
-        """
-        return progress_remaining * initial_value
-
-    return func
-
-
-# Create model
-policy_kwargs = dict(net_arch=[100, 100, 100, 100, 100, 100, 100])
-env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
-
-model = QRDQN(
-    'MlpPolicy',
-    env,
-    learning_rate=5e-4,  #linear_schedule(0.05),
-    policy_kwargs=policy_kwargs,
-    buffer_size=PARAM_REPLAY_BUFFER_CAPACITY,
-    learning_starts=PARAM_INITIAL_COLLECT_STEPS,
-    gamma=0.99,
-    exploration_fraction=0.5,
-    batch_size=128,
-    train_freq=(100, 'step'),
-    tensorboard_log=LOG_DIR)
-# model = PPO(
-#     'MlpPolicy',
-#     env,
-#     learning_rate=linear_schedule(0.001),
-#     policy_kwargs=policy_kwargs,
-#     gamma=0.99,
-#     batch_size=64,
-#     tensorboard_log=LOG_DIR)
-
-
-# Will use this custom callback to compute metric for Tuner
-custom_evaluate_callback = EvaluateAndLogCallback(
-    eval_env,
-    eval_interval=PARAM_EVAL_INTERVAL_EPISODES * PARAM_COLLECT_STEPS_PER_ITERATION,
-    log_interval=PARAM_LOG_INTERVAL_EPISODES * PARAM_COLLECT_STEPS_PER_ITERATION)
-
-# SB3 callback to evaluate the policy and log in TB
-eval_callback = EvalCallback(
-    eval_env,
-    n_eval_episodes=2,
-    eval_freq=PARAM_EVAL_INTERVAL_EPISODES * PARAM_COLLECT_STEPS_PER_ITERATION)
-
-model.learn(
-    total_timesteps=PARAM_COLLECT_STEPS_PER_ITERATION * 5000,
-    reset_num_timesteps=False,
-    callback=[eval_callback, custom_evaluate_callback],
-    tb_log_name=f'test_35')
-
-
-
+# Save best values to file
+best_values_file = os.path.join(os.path.dirname(__file__), f"{EXECUTION_ID}/best_values.txt")
+with open(best_values_file, 'w') as f:
+    f.write(str(best_values))
 
 print('Finished!')

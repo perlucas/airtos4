@@ -7,7 +7,7 @@ from . import load_dataset
 
 # ====================================== Utils functions ======================================
 
-def create_env(env_type: str, df, window_size, frame_bound):
+def create_env(env_type: str, df, window_size, frame_bound, no_action_punishment=0):
     '''Create an environment based on the type of environment (only 'com' is supported)
     :param env_type: str: The type of environment to create
     :param df: pd.DataFrame: The dataframe to use for the environment
@@ -16,11 +16,11 @@ def create_env(env_type: str, df, window_size, frame_bound):
     :return: CombinedEnv: The environment created
     '''
     if env_type == 'com':
-        return CombinedEnv(df=df, window_size=window_size, frame_bound=frame_bound)
+        return CombinedEnv(df=df, window_size=window_size, frame_bound=frame_bound, no_action_punishment=no_action_punishment)
     raise NotImplementedError('unknown type')
 
 
-def create_training_envs(env_type: str):
+def create_training_envs(env_type: str, no_action_punishment=0):
     '''Create a list of training environments based on the type of environment
     :param env_type: str: The type of environment to create
     :return: list: The list of training environments created
@@ -39,43 +39,43 @@ def create_training_envs(env_type: str):
 
     return [
         # KO training envs
-        create_env(env_type, ko_df, window_size, (10, 120)),
-        create_env(env_type, ko_df, window_size, (120, 230)),
-        create_env(env_type, ko_df, window_size, (350, 470)),
-        create_env(env_type, ko_df, window_size, (1000, 1120)),
-        create_env(env_type, ko_df, window_size, (1700, 1820)),
+        create_env(env_type, ko_df, window_size, (10, 120), no_action_punishment=no_action_punishment),
+        create_env(env_type, ko_df, window_size, (120, 230), no_action_punishment=no_action_punishment),
+        create_env(env_type, ko_df, window_size, (350, 470), no_action_punishment=no_action_punishment),
+        create_env(env_type, ko_df, window_size, (1000, 1120), no_action_punishment=no_action_punishment),
+        create_env(env_type, ko_df, window_size, (1700, 1820), no_action_punishment=no_action_punishment),
 
         # AMZN training envs
-        create_env(env_type, amzn_df, window_size, (10, 120)),
-        create_env(env_type, amzn_df, window_size, (120, 230)),
-        create_env(env_type, amzn_df, window_size, (350, 470)),
-        create_env(env_type, amzn_df, window_size, (1000, 1120)),
-        create_env(env_type, amzn_df, window_size, (1700, 1820)),
+        create_env(env_type, amzn_df, window_size, (10, 120), no_action_punishment=no_action_punishment),
+        create_env(env_type, amzn_df, window_size, (120, 230), no_action_punishment=no_action_punishment),
+        create_env(env_type, amzn_df, window_size, (350, 470), no_action_punishment=no_action_punishment),
+        create_env(env_type, amzn_df, window_size, (1000, 1120), no_action_punishment=no_action_punishment),
+        create_env(env_type, amzn_df, window_size, (1700, 1820), no_action_punishment=no_action_punishment),
 
         # AMD training envs
-        create_env(env_type, amd_df, window_size, (10, 120)),
-        create_env(env_type, amd_df, window_size, (120, 230)),
-        create_env(env_type, amd_df, window_size, (350, 470)),
-        create_env(env_type, amd_df, window_size, (1000, 1120)),
-        create_env(env_type, amd_df, window_size, (1700, 1820)),
+        create_env(env_type, amd_df, window_size, (10, 120), no_action_punishment=no_action_punishment),
+        create_env(env_type, amd_df, window_size, (120, 230), no_action_punishment=no_action_punishment),
+        create_env(env_type, amd_df, window_size, (350, 470), no_action_punishment=no_action_punishment),
+        create_env(env_type, amd_df, window_size, (1000, 1120), no_action_punishment=no_action_punishment),
+        create_env(env_type, amd_df, window_size, (1700, 1820), no_action_punishment=no_action_punishment),
 
         # PYPL training envs
-        create_env(env_type, pypl_df, window_size, (10, 120)),
-        create_env(env_type, pypl_df, window_size, (120, 230)),
-        create_env(env_type, pypl_df, window_size, (350, 470)),
-        create_env(env_type, pypl_df, window_size, (1000, 1120)),
-        create_env(env_type, pypl_df, window_size, (1700, 1820)),
+        create_env(env_type, pypl_df, window_size, (10, 120), no_action_punishment=no_action_punishment),
+        create_env(env_type, pypl_df, window_size, (120, 230), no_action_punishment=no_action_punishment),
+        create_env(env_type, pypl_df, window_size, (350, 470), no_action_punishment=no_action_punishment),
+        create_env(env_type, pypl_df, window_size, (1000, 1120), no_action_punishment=no_action_punishment),
+        create_env(env_type, pypl_df, window_size, (1700, 1820), no_action_punishment=no_action_punishment),
 
         # NFLX training envs
-        create_env(env_type, nflx_df, window_size, (10, 120)),
-        create_env(env_type, nflx_df, window_size, (120, 230)),
-        create_env(env_type, nflx_df, window_size, (350, 470)),
-        create_env(env_type, nflx_df, window_size, (1000, 1120)),
-        create_env(env_type, nflx_df, window_size, (1700, 1820)),
+        create_env(env_type, nflx_df, window_size, (10, 120), no_action_punishment=no_action_punishment),
+        create_env(env_type, nflx_df, window_size, (120, 230), no_action_punishment=no_action_punishment),
+        create_env(env_type, nflx_df, window_size, (350, 470), no_action_punishment=no_action_punishment),
+        create_env(env_type, nflx_df, window_size, (1000, 1120), no_action_punishment=no_action_punishment),
+        create_env(env_type, nflx_df, window_size, (1700, 1820), no_action_punishment=no_action_punishment),
     ]
 
 
-def create_testing_env(env_type: str):
+def create_testing_env(env_type: str, no_action_punishment=0):
     '''Create a testing environment based on the type of environment
     :param env_type: str: The type of environment to create
     :return: CombinedEnv: The testing environment created
@@ -86,7 +86,7 @@ def create_testing_env(env_type: str):
     
     ko_df = load_dataset(file_to_path('KO.csv'))
     window_size = 10
-    return create_env(env_type, ko_df, window_size, (2000, 2300))
+    return create_env(env_type, ko_df, window_size, (2000, 2300), no_action_punishment=no_action_punishment)
 
 
 # ====================================== Random Picker ======================================
@@ -124,14 +124,21 @@ class BufferedRandomPicker:
 ENV_TYPE = 'com'
 
 # Create training and testing environments
-train_envs = create_training_envs(ENV_TYPE)
-eval_env = create_testing_env(ENV_TYPE)
 
-# Create a random picker for training environments
-picker = BufferedRandomPicker(train_envs)
-def get_random_train_env():
-    '''Get a random training environment
-    :return: TFPyEnvironment: The random training environment
+def testing_env(no_action_punishment=0):
+    '''Create a testing environment
+    :return: CombinedEnv: The testing environment created
     '''
-    env = picker.pick_random()
-    return env
+    return create_testing_env(ENV_TYPE, no_action_punishment=no_action_punishment)
+
+def random_train_env_getter(no_action_punishment=0):
+    train_envs = create_training_envs(ENV_TYPE, no_action_punishment=no_action_punishment)
+    picker = BufferedRandomPicker(train_envs)
+    def get_random_train_env():
+        '''Get a random training environment
+        :return: TFPyEnvironment: The random training environment
+        '''
+        env = picker.pick_random()
+        return env
+    return get_random_train_env
+

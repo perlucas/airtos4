@@ -37,7 +37,7 @@ class TradingEnv(gym.Env):
     """Trading Environment implementing the OpenAI Gym interface"""
     metadata = {"render_modes": [], "render_fps": 1}
 
-    def __init__(self, df, window_size, frame_bound, render_mode=None):
+    def __init__(self, df, window_size, frame_bound, render_mode=None, no_action_punishment=0):
         """
         Create a new environment for stocks trading.
 
@@ -86,8 +86,8 @@ class TradingEnv(gym.Env):
         self._current_tick = None
         self._history = None
         self._profit = None
-        self._punishment_on_none = 2
-        self._current_punishment = 0
+        self._punishment_on_no_action = no_action_punishment
+        self._cumulated_punish_counter = 0
         self._session = TradingSession(fee = 2)
 
 
@@ -114,7 +114,7 @@ class TradingEnv(gym.Env):
         self._history = []
         self._current_tick = self._start_tick
         self._profit = 0
-        self._current_punishment = 0
+        self._cumulated_punish_counter = 0
         self._session.reset()
 
         observation = self._get_observation()
@@ -131,17 +131,18 @@ class TradingEnv(gym.Env):
         step_reward = 0
         action, num_shares = extract_action_and_num_shares(action_code)
 
-        self._current_punishment += 1
+        # Increase punishment on consecutive no actions
+        self._cumulated_punish_counter += 1
         
         if action == 'buy':
             step_reward = self._session.open_long(current_price, num_shares)
-            self._current_punishment = 0
+            self._cumulated_punish_counter = 0
         elif action == 'sell':
             step_reward = self._session.open_short(current_price, num_shares)
-            self._current_punishment = 0
+            self._cumulated_punish_counter = 0
 
-        # Add daily punishment (disabled)
-        punishment = self._current_punishment * self._punishment_on_none
+        # Add punishment for no action
+        punishment = self._cumulated_punish_counter * self._punishment_on_no_action
         step_reward -= punishment
         
         self._profit += step_reward

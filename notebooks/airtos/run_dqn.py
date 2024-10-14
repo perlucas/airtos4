@@ -7,6 +7,7 @@ sys.modules["gym"] = gymnasium
 
 import os
 from datetime import datetime
+import threading
 
 from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
@@ -16,6 +17,7 @@ from utils.envs.sb3 import testing_env, random_train_env_getter
 
 
 # =============================== General parameters ===============================================
+eval_env = testing_env(no_action_punishment=2)
 get_random_train_env = random_train_env_getter(no_action_punishment=2)
 
 EXECUTION_ID = datetime.now().strftime('%Y-%m-%d_%H%M%S')
@@ -25,27 +27,55 @@ LOG_DIR = os.path.join(
     EXECUTION_ID
 )
 
-PARAM_NUM_ITERATIONS = 500
+PARAM_NUM_ITERATIONS = 3000
 PARAM_COLLECT_STEPS_PER_ITERATION = 250
 PARAM_INITIAL_COLLECT_STEPS = 1000
 PARAM_REPLAY_BUFFER_CAPACITY = 100000
 PARAM_LOG_INTERVAL_EPISODES = 10
 PARAM_EVAL_INTERVAL_EPISODES = 25
-PARAM_SWITCH_ENV_INTERVAL = 5
+PARAM_SWITCH_ENV_INTERVAL = 5 * PARAM_COLLECT_STEPS_PER_ITERATION
+
+# =============================== Switch Environment Wrapper ==============================
+class SwitchEnvWrapper(gymnasium.Wrapper):
+    
+    def __init__(self, env, switch_interval):
+        super().__init__(env)
+        self.switch_interval = switch_interval
+        self.should_switch = False
+        self.n_steps = 0
+
+    def step(self, action):
+        obs, reward, done, truncated, info = self.env.step(action)
+        self.n_steps += 1
+
+        if self.n_steps % self.switch_interval == 0:
+            self.should_switch = True
+
+        if done and self.should_switch:
+            self.should_switch = False
+            self.env = get_random_train_env()
+            # print(f'Switched environment at step {self.n_steps}')
+        
+        return obs, reward, done, truncated, info
 
 # =============================== Callbacks ===============================================
 class EvaluateAndLogCallback(BaseCallback):
     '''Custom callback to evaluate the policy and log the average return mean'''
 
-    def __init__(self, eval_env, verbose=0):
+    def __init__(self, eval_env, log_interval, eval_interval, verbose=0):
         super().__init__(verbose)
         self.eval_env = eval_env
-        self.episode = 0
+        self.eval_interval = eval_interval
+        self.log_interval = log_interval
         self.last_n_avg_returns = []
         self.last_n_avg_returns_len = 4
 
-    def _on_training_end(self) -> None:
-        if self.episode % PARAM_EVAL_INTERVAL_EPISODES != 0:
+    def _on_step(self) -> bool:
+
+        if self.n_calls % self.log_interval == 0:
+            print(f'Step {self.n_calls}')
+        
+        if self.n_calls % self.eval_interval != 0:
             return True
 
         # Evaluate policy and log avg_return
@@ -57,6 +87,7 @@ class EvaluateAndLogCallback(BaseCallback):
             obs, _reward, done, _truncated, info = self.eval_env.step(action)
             total_reward += _reward
         print(f'Step {self.n_calls} - Total reward: {total_reward}')
+        print(f'Number of active threads: {threading.active_count()}')
 
         # Log the average return in the buffer
         self.last_n_avg_returns.append(total_reward)
@@ -64,6 +95,9 @@ class EvaluateAndLogCallback(BaseCallback):
             self.last_n_avg_returns.pop(0)
         return True
     
+    def _on_training_end(self) -> None:
+        return True
+
     def get_avg_return(self):
         return sum(self.last_n_avg_returns) / len(self.last_n_avg_returns)
     
@@ -72,9 +106,6 @@ class EvaluateAndLogCallback(BaseCallback):
 
     def _on_rollout_start(self) -> None:
         pass
-
-    def _on_step(self) -> bool:
-        return True
 
     def _on_rollout_end(self) -> None:
         pass
@@ -95,7 +126,7 @@ class AirtosHyperModel(kt.HyperModel):
         learning_rate = hp.Float('learning_rate', min_value=1e-5, max_value=1e-3, sampling='log')
 
         # Create model
-        env = get_random_train_env()
+        env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
         model = DQN(
             'MlpPolicy',
             env,
@@ -104,21 +135,20 @@ class AirtosHyperModel(kt.HyperModel):
             buffer_size=PARAM_REPLAY_BUFFER_CAPACITY,
             learning_starts=PARAM_INITIAL_COLLECT_STEPS,
             gamma=0.99,
+            batch_size=128,
             exploration_fraction=0.5,
             train_freq=(100, 'step'),
-            batch_size=128, # hp.Choice('batch_size', [32, 64, 128])
             tensorboard_log=LOG_DIR)
         return model
 
 
     def run(self, hp, model, trial, *args, **kwargs):
-        agent = model
-
-        eval_env = testing_env(no_action_punishment=2)
         
         # Will use this custom callback to compute metric for Tuner
-        custom_evaluate_callback = EvaluateAndLogCallback(eval_env)
-        custom_evaluate_callback.episode = 0
+        custom_evaluate_callback = EvaluateAndLogCallback(
+            eval_env,
+            eval_interval=PARAM_EVAL_INTERVAL_EPISODES * PARAM_COLLECT_STEPS_PER_ITERATION,
+            log_interval=PARAM_LOG_INTERVAL_EPISODES * PARAM_COLLECT_STEPS_PER_ITERATION)
 
         # SB3 callback to evaluate the policy and log in TB
         eval_callback = EvalCallback(
@@ -126,23 +156,11 @@ class AirtosHyperModel(kt.HyperModel):
             n_eval_episodes=2,
             eval_freq=PARAM_EVAL_INTERVAL_EPISODES * PARAM_COLLECT_STEPS_PER_ITERATION)
 
-        for episode in range(PARAM_NUM_ITERATIONS):
-            # Train episode
-            agent.learn(
-                total_timesteps=PARAM_COLLECT_STEPS_PER_ITERATION,
-                reset_num_timesteps=False,
-                callback=[custom_evaluate_callback, eval_callback],
-                tb_log_name=f'trial_{trial.trial_id}')
-            
-            if episode % PARAM_LOG_INTERVAL_EPISODES == 0:
-                print(f'Episode {episode} done!')
-
-            # Switch training environment
-            if episode % PARAM_SWITCH_ENV_INTERVAL == 0:
-                env = get_random_train_env()
-                agent.set_env(env)
-            
-            custom_evaluate_callback.episode += 1
+        model.learn(
+            total_timesteps=PARAM_COLLECT_STEPS_PER_ITERATION * PARAM_NUM_ITERATIONS,
+            reset_num_timesteps=False,
+            callback=[custom_evaluate_callback, eval_callback],
+            tb_log_name=f'trial_{trial.trial_id}')
 
         return { 'avg_return': custom_evaluate_callback.get_avg_return() }
 
@@ -164,8 +182,7 @@ tuner = AirtosTunner(
     project_name=f'airtos4_{EXECUTION_ID}',
     tuner_id='airtos4_tuner1',
     overwrite=False,
-    beta=10,
-    executions_per_trial=3,
+    executions_per_trial=2,
     allow_new_entries=True,
     tune_new_entries=True
 )

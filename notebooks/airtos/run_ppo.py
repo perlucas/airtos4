@@ -176,6 +176,7 @@ tuner = AirtosTunner(
     project_name=f'airtos4_{EXECUTION_ID}',
     tuner_id='airtos4_tuner1',
     overwrite=False,
+    beta=10,
     executions_per_trial=2,
     allow_new_entries=True,
     tune_new_entries=True

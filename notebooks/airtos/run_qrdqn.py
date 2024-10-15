@@ -13,10 +13,13 @@ from sb3_contrib import QRDQN
 from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
 import keras_tuner as kt
 
-from utils.envs.sb3 import eval_env, get_random_train_env
+from utils.envs.sb3 import testing_env, random_train_env_getter
 
 
 # =============================== General parameters ===============================================
+eval_env = testing_env(no_action_punishment=2)
+get_random_train_env = random_train_env_getter(no_action_punishment=2)
+
 EXECUTION_ID = datetime.now().strftime('%Y-%m-%d_%H%M%S')
 
 LOG_DIR = os.path.join(
@@ -113,14 +116,14 @@ class AirtosHyperModel(kt.HyperModel):
     def build(self, hp):
         # Compute the number of layers for the DQN agent
         layers_list = []
-        num_layers = hp.Choice("num_layers", [2, 3, 4, 6, 9, 12, 15])
-        layer_units = hp.Int("layer_units", min_value=50, max_value=400, step=50)
+        num_layers = hp.Choice("num_layers", [2, 3, 4, 5])
+        layer_units = hp.Int("layer_units", min_value=25, max_value=200, step=25)
         for _ in range(num_layers):
             layers_list.append(layer_units)
         policy_kwargs = dict(net_arch=layers_list)
 
         # Compute optimizer learning rate
-        learning_rate = hp.Float('learning_rate', min_value=1e-7, max_value=1e-2, sampling='log')
+        learning_rate = hp.Float('learning_rate', min_value=1e-8, max_value=1e-4, sampling='log')
 
         # Create model
         env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
@@ -132,7 +135,7 @@ class AirtosHyperModel(kt.HyperModel):
             buffer_size=PARAM_REPLAY_BUFFER_CAPACITY,
             learning_starts=PARAM_INITIAL_COLLECT_STEPS,
             gamma=0.99,
-            batch_size=hp.Choice('batch_size', [32, 64, 128]),
+            batch_size=128,
             exploration_fraction=0.5,
             train_freq=(100, 'step'),
             tensorboard_log=LOG_DIR)
@@ -172,7 +175,7 @@ class AirtosTunner(kt.BayesianOptimization):
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
     objective=kt.Objective(name='avg_return', direction='max'),
-    max_trials=100,
+    max_trials=150,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
     directory=os.path.join(os.path.dirname(__file__), EXECUTION_ID),
@@ -180,7 +183,7 @@ tuner = AirtosTunner(
     tuner_id='airtos4_tuner1',
     beta=10,
     overwrite=False,
-    executions_per_trial=1,
+    executions_per_trial=2,
     allow_new_entries=True,
     tune_new_entries=True
 )

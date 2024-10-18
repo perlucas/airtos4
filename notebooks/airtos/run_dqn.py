@@ -17,7 +17,7 @@ from utils.envs.sb3 import testing_env, random_train_env_getter
 
 
 # =============================== General parameters ===============================================
-eval_env = testing_env(no_action_punishment=2)
+eval_env = testing_env(no_action_punishment=0)
 get_random_train_env = random_train_env_getter(no_action_punishment=2)
 
 EXECUTION_ID = datetime.now().strftime('%Y-%m-%d_%H%M%S')

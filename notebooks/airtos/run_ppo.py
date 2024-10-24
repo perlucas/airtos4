@@ -27,7 +27,7 @@ LOG_DIR = os.path.join(
     EXECUTION_ID
 )
 
-PARAM_NUM_ITERATIONS = 3000
+PARAM_NUM_ITERATIONS = 1700 # 3000
 PARAM_COLLECT_STEPS_PER_ITERATION = 250
 PARAM_LOG_INTERVAL_EPISODES = 10
 PARAM_EVAL_INTERVAL_EPISODES = 25
@@ -114,14 +114,15 @@ class AirtosHyperModel(kt.HyperModel):
     def build(self, hp):
         # Compute the number of layers for the DQN agent
         layers_list = []
-        num_layers = hp.Int("num_layers", min_value=4, max_value=24, step=4)
-        layer_units = hp.Choice("layer_units", [50, 100, 200, 400, 500])
+        # num_layers = hp.Int("num_layers", min_value=4, max_value=24, step=4)
+        num_layers = hp.Choice("num_layers", [4, 10, 15, 20, 25])
+        layer_units = hp.Choice("layer_units", [25, 35, 50, 75, 100])
         for _ in range(num_layers):
             layers_list.append(layer_units)
         policy_kwargs = dict(net_arch=layers_list)
 
         # Compute optimizer learning rate
-        learning_rate = hp.Float('learning_rate', min_value=1e-7, max_value=1e-5, step=1.237e-6)
+        learning_rate = hp.Float('learning_rate', min_value=1e-6, max_value=7e-6, step=2e-6)
 
         # Create model
         env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
@@ -177,7 +178,7 @@ tuner = AirtosTunner(
     tuner_id='airtos4_tuner1',
     overwrite=False,
     beta=10,
-    executions_per_trial=2,
+    executions_per_trial=3,
     allow_new_entries=True,
     tune_new_entries=True
 )

@@ -115,15 +115,15 @@ class AirtosHyperModel(kt.HyperModel):
         # Compute the number of layers for the DQN agent
         layers_list = []
         # num_layers = hp.Int("num_layers", min_value=4, max_value=24, step=4)
-        num_layers = hp.Choice("num_layers", [4, 8, 12, 16])
-        layer_units = hp.Choice("layer_units", [25, 50, 75, 100])
+        num_layers = hp.Choice("num_layers", [4, 8, 12])
+        layer_units = hp.Choice("layer_units", [25, 50, 75])
         for _ in range(num_layers):
             layers_list.append(layer_units)
         policy_kwargs = dict(net_arch=layers_list)
 
         # Compute optimizer learning rate
-        # learning_rate = hp.Float('learning_rate', min_value=1e-7, max_value=1e-5, step=2e-6)
-        learning_rate = hp.Choice('learning_rate', [6e-8, 1e-7, 5e-7, 1e-6, 5e-6])
+        learning_rate = hp.Float('learning_rate', min_value=1e-6, max_value=5e-4, sampling='log', step=2)
+        # learning_rate = hp.Choice('learning_rate', [6e-8, 1e-7, 5e-7, 1e-6, 5e-6])
 
         # Create model
         env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
@@ -133,6 +133,7 @@ class AirtosHyperModel(kt.HyperModel):
             learning_rate=learning_rate,
             policy_kwargs=policy_kwargs,
             gamma=0.99,
+            seed=42,
             tensorboard_log=LOG_DIR)
         return model
 
@@ -174,7 +175,7 @@ class AirtosTunner(kt.GridSearch):
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
     objective=kt.Objective(name='avg_return', direction='max'),
-    max_trials=250,
+    max_trials=130,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
     directory=os.path.join(os.path.dirname(__file__), EXECUTION_ID),

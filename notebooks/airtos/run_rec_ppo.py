@@ -10,7 +10,7 @@ from datetime import datetime
 import threading
 
 from sb3_contrib import RecurrentPPO
-from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
+from stable_baselines3.common.callbacks import BaseCallback, EvalCallback, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement
 import keras_tuner as kt
 
 from utils.envs.sb3 import testing_env, random_train_env_getter
@@ -27,7 +27,7 @@ LOG_DIR = os.path.join(
     EXECUTION_ID
 )
 
-PARAM_NUM_ITERATIONS = 3000
+PARAM_NUM_ITERATIONS = 6000
 PARAM_COLLECT_STEPS_PER_ITERATION = 250
 PARAM_LOG_INTERVAL_EPISODES = 10
 PARAM_EVAL_INTERVAL_EPISODES = 25
@@ -114,14 +114,16 @@ class AirtosHyperModel(kt.HyperModel):
     def build(self, hp):
         # Compute the number of layers for the DQN agent
         layers_list = []
-        num_layers = hp.Int("num_layers", min_value=4, max_value=24, step=4)
-        layer_units = hp.Choice("layer_units", [50, 100, 200, 400, 500])
+        # num_layers = hp.Int("num_layers", min_value=4, max_value=24, step=4)
+        num_layers = hp.Choice("num_layers", [4, 8, 12, 16])
+        layer_units = hp.Choice("layer_units", [25, 50, 100, 200, 400])
         for _ in range(num_layers):
             layers_list.append(layer_units)
         policy_kwargs = dict(net_arch=layers_list)
 
         # Compute optimizer learning rate
-        learning_rate = hp.Float('learning_rate', min_value=1e-7, max_value=1e-5, step=1.237e-6)
+        learning_rate = hp.Float('learning_rate', min_value=5e-7, max_value=5e-5, sampling='log', step=2)
+        # learning_rate = hp.Choice('learning_rate', [1e-7, 5e-7, 1e-6, 5e-6, 7e-6])
 
         # Create model
         env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
@@ -132,6 +134,7 @@ class AirtosHyperModel(kt.HyperModel):
             policy_kwargs=policy_kwargs,
             gamma=0.99,
             batch_size=128,
+            seed=42,
             tensorboard_log=LOG_DIR)
         return model
 
@@ -145,9 +148,13 @@ class AirtosHyperModel(kt.HyperModel):
             log_interval=PARAM_LOG_INTERVAL_EPISODES * PARAM_COLLECT_STEPS_PER_ITERATION)
 
         # SB3 callback to evaluate the policy and log in TB
+        callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=8300, verbose=1)
+        stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=4, min_evals=10, verbose=1)
         eval_callback = EvalCallback(
             eval_env,
             n_eval_episodes=2,
+            callback_on_new_best=callback_on_best,
+            callback_after_eval=stop_train_callback,
             eval_freq=PARAM_EVAL_INTERVAL_EPISODES * PARAM_COLLECT_STEPS_PER_ITERATION)
 
         model.learn(
@@ -158,7 +165,7 @@ class AirtosHyperModel(kt.HyperModel):
 
         return { 'avg_return': custom_evaluate_callback.get_avg_return() }
 
-class AirtosTunner(kt.BayesianOptimization):
+class AirtosTunner(kt.GridSearch):
 
     def run_trial(self, trial, *args, **kwargs):
         hp = trial.hyperparameters
@@ -169,15 +176,15 @@ class AirtosTunner(kt.BayesianOptimization):
 tuner = AirtosTunner(
     hypermodel=AirtosHyperModel(name='airtos4'),
     objective=kt.Objective(name='avg_return', direction='max'),
-    max_trials=140,
+    max_trials=180,
     max_retries_per_trial=0,
     max_consecutive_failed_trials=3,
     directory=os.path.join(os.path.dirname(__file__), EXECUTION_ID),
     project_name=f'airtos4_{EXECUTION_ID}',
     tuner_id='airtos4_tuner1',
     overwrite=False,
-    beta=10,
-    executions_per_trial=2,
+    # beta=10,
+    executions_per_trial=3,
     allow_new_entries=True,
     tune_new_entries=True
 )

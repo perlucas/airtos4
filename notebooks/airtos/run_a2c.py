@@ -116,14 +116,14 @@ class AirtosHyperModel(kt.HyperModel):
         layers_list = []
         # num_layers = hp.Int("num_layers", min_value=4, max_value=24, step=4)
         num_layers = hp.Choice("num_layers", [4, 8, 12])
-        layer_units = hp.Choice("layer_units", [25, 50, 75])
+        layer_units = hp.Choice("layer_units", [25, 50, 100])
         for _ in range(num_layers):
             layers_list.append(layer_units)
         policy_kwargs = dict(net_arch=layers_list)
 
         # Compute optimizer learning rate
-        learning_rate = hp.Float('learning_rate', min_value=1e-6, max_value=5e-4, sampling='log', step=2)
-        # learning_rate = hp.Choice('learning_rate', [6e-8, 1e-7, 5e-7, 1e-6, 5e-6])
+        # learning_rate = hp.Float('learning_rate', min_value=5e-6, max_value=5e-2, sampling='log', step=2)
+        learning_rate = hp.Choice('learning_rate', [5e-6, 3e-5, 6e-5, 3e-4, 6e-4, 3e-3, 6e-3, 3e-2, 6e-2, 3e-1])
 
         # Create model
         env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)

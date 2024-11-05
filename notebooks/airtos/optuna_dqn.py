@@ -8,7 +8,7 @@ sys.modules["gym"] = gymnasium
 import os
 from datetime import datetime
 
-from stable_baselines3 import A2C
+from stable_baselines3 import DQN
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement
 from stable_baselines3.common.evaluation import evaluate_policy
 import optuna
@@ -62,7 +62,6 @@ RUNS_PER_TRIAL = 3
 
 def objective(trial):
     learning_rate = trial.suggest_loguniform("learning_rate", 1e-7, 1e-2)
-    ent_coef = trial.suggest_float("ent_coef", 0.0, 0.01)
     
     num_layers = trial.suggest_categorical("num_layers", [3, 4, 5, 8, 12])
     layer_units = trial.suggest_categorical("layer_units", [15, 25, 50, 75, 100])
@@ -71,14 +70,17 @@ def objective(trial):
 
     env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
     def get_model():
-        return A2C(
+        return DQN(
             'MlpPolicy',
             env,
             learning_rate=learning_rate,
             policy_kwargs=policy_kwargs,
             gamma=0.99,
+            batch_size=128,
+            learning_starts=1000,
             seed=42,
-            ent_coef=ent_coef,
+            exploration_fraction=0.5,
+            train_freq=(100, 'step'),
             tensorboard_log=LOG_DIR)
     
     def train_model(model):

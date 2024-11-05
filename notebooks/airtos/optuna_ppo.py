@@ -58,7 +58,7 @@ class SwitchEnvWrapper(gymnasium.Wrapper):
 
 
 # =============================== Init and Run Tuner ===============================================
-RUNS_PER_TRIAL = 5
+RUNS_PER_TRIAL = 3
 
 def objective(trial):
     learning_rate = trial.suggest_loguniform("learning_rate", 1e-7, 1e-2)
@@ -112,6 +112,6 @@ def objective(trial):
     return sum(total_eval_results) / len(total_eval_results)
 
 study = optuna.create_study(direction="maximize")
-study.optimize(objective, n_trials=3000, n_jobs=1)
+study.optimize(objective, n_trials=1000, n_jobs=1)
 
 print('Finished!')

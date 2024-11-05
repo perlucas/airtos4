@@ -77,7 +77,7 @@ def objective(trial):
             learning_rate=learning_rate,
             policy_kwargs=policy_kwargs,
             gamma=0.99,
-            # seed=42,
+            seed=42,
             ent_coef=ent_coef,
             tensorboard_log=LOG_DIR)
     

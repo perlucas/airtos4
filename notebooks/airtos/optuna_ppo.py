@@ -79,7 +79,7 @@ def objective(trial):
             policy_kwargs=policy_kwargs,
             gamma=0.99,
             batch_size=128,
-            seed=42,
+            # seed=42,
             ent_coef=ent_coef,
             clip_range=clip_range,
             tensorboard_log=LOG_DIR)
@@ -106,6 +106,7 @@ def objective(trial):
         train_model(model)
         eval_results = evaluate_policy(model, eval_env, n_eval_episodes=2)
         total_eval_results.append(eval_results[0])
+        model.logger.close()
         model = None
     
     return sum(total_eval_results) / len(total_eval_results)

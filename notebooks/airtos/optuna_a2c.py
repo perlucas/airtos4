@@ -58,14 +58,13 @@ class SwitchEnvWrapper(gymnasium.Wrapper):
 
 
 # =============================== Init and Run Tuner ===============================================
-RUNS_PER_TRIAL = 3
+RUNS_PER_TRIAL = 5
 
 def objective(trial):
-    learning_rate = trial.suggest_loguniform("learning_rate", 1e-7, 1e-2)
-    ent_coef = trial.suggest_float("ent_coef", 0.0, 0.01)
+    learning_rate = trial.suggest_loguniform("learning_rate", 1e-8, 1e-6)
     
-    num_layers = trial.suggest_categorical("num_layers", [3, 4, 5, 8, 12])
-    layer_units = trial.suggest_categorical("layer_units", [15, 25, 50, 75, 100])
+    num_layers = trial.suggest_categorical("num_layers", [2, 4, 6, 8, 10])
+    layer_units = trial.suggest_categorical("layer_units", [10, 25, 50, 100, 200])
     layers_list = [layer_units] * num_layers
     policy_kwargs = dict(net_arch=layers_list)
 
@@ -78,7 +77,6 @@ def objective(trial):
             policy_kwargs=policy_kwargs,
             gamma=0.99,
             seed=42,
-            ent_coef=ent_coef,
             tensorboard_log=LOG_DIR)
     
     def train_model(model):
@@ -97,13 +95,20 @@ def objective(trial):
             callback=[eval_callback],
             tb_log_name=f'trial_{trial.number}')
     
+    best_mean = 4000
     total_eval_results = []
     for _ in range(RUNS_PER_TRIAL):
         model = get_model()
         train_model(model)
-        eval_results = evaluate_policy(model, eval_env, n_eval_episodes=2)
-        total_eval_results.append(eval_results[0])
+        mean, _unused = evaluate_policy(model, eval_env, n_eval_episodes=2)
+        total_eval_results.append(mean)
         model.logger.close()
+
+        if mean > best_mean:
+            best_mean = mean
+            model.save(os.path.join(LOG_DIR, f'trial_{trial.number}_best_model'))
+            print(f'New best model saved with mean return: {mean}')
+
         model = None
     
     return sum(total_eval_results) / len(total_eval_results)

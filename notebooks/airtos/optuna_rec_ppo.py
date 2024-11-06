@@ -8,7 +8,7 @@ sys.modules["gym"] = gymnasium
 import os
 from datetime import datetime
 
-from stable_baselines3 import PPO
+from sb3_contrib import RecurrentPPO
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement
 from stable_baselines3.common.evaluation import evaluate_policy
 import optuna
@@ -61,17 +61,17 @@ class SwitchEnvWrapper(gymnasium.Wrapper):
 RUNS_PER_TRIAL = 5
 
 def objective(trial):
-    learning_rate = trial.suggest_loguniform("learning_rate", 1e-6, 1e-5)
+    learning_rate = trial.suggest_loguniform("learning_rate", 1e-7, 1e-4)
     
     num_layers = trial.suggest_categorical("num_layers", [4, 6, 8, 10, 12])
-    layer_units = trial.suggest_categorical("layer_units", [10, 25, 50, 75, 100, 200])
+    layer_units = trial.suggest_categorical("layer_units", [10, 25, 50, 100, 200])
     layers_list = [layer_units] * num_layers
     policy_kwargs = dict(net_arch=layers_list)
 
     env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
     def get_model():
-        return PPO(
-            'MlpPolicy',
+        return RecurrentPPO(
+            'MlpLstmPolicy',
             env,
             learning_rate=learning_rate,
             policy_kwargs=policy_kwargs,
@@ -96,8 +96,8 @@ def objective(trial):
             callback=[eval_callback],
             tb_log_name=f'trial_{trial.number}')
     
-    best_mean = 6000
     total_eval_results = []
+    best_mean = 4000
     for _ in range(RUNS_PER_TRIAL):
         model = get_model()
         train_model(model)

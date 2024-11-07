@@ -1,5 +1,6 @@
 import numpy as np
 import gymnasium as gym
+import matplotlib.pyplot as plt
 
 from gymnasium import spaces
 
@@ -164,10 +165,6 @@ class TradingEnv(gym.Env):
         return observation, step_reward, episode_ended, False, self._get_info()
 
 
-    def render(self):
-        """Render the environment"""
-        raise NotImplementedError
-
     def close(self):
         """Close the environment"""
         pass
@@ -176,3 +173,36 @@ class TradingEnv(gym.Env):
     # TODO: Implement the rest of the methods
     def _process_data(self):
         raise NotImplementedError
+
+    def render(self):
+        """Render the environment"""
+        raise NotImplementedError
+    
+    def save_render(self, filename="trading_env"):
+        """Render the environment and save it into a file
+        Args:
+            filename: string, target filename. Defaults to 'trading_env'
+        """
+
+        COLOR_CODES = {
+            ACTION_NOOP: None,
+            ACTION_BUY_LOW: '#9ce612', # light green
+            ACTION_BUY_MEDIUM: '#57b01c', # green
+            ACTION_BUY_HIGH: '#2a540e', # dark green
+            ACTION_SELL_LOW: '#fa6664', # light red
+            ACTION_SELL_MEDIUM: '#e6110e', # red
+            ACTION_SELL_HIGH: '#730f0e', # dark red
+        }
+
+        plt.cla()
+        plt.plot(self.prices)
+
+        # Render each position from history
+        _tick = self._start_tick
+        for past_action in self._history:
+            color = COLOR_CODES[int(past_action)]
+            if color is not None:
+                plt.scatter(_tick, self.prices[_tick], color=color)
+            _tick += 1
+
+        plt.savefig(filename)

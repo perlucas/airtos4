@@ -30,48 +30,110 @@ def create_training_envs(env_type: str, no_action_punishment=0):
         return path.join(path.dirname(__file__), f'stocks_data/{file}')
 
     # use file from this file's directory
-    ko_df = load_dataset(file_to_path('KO.csv'))
-    amzn_df = load_dataset(file_to_path('AMZN.csv'))
-    amd_df = load_dataset(file_to_path('AMD.csv'))
-    pypl_df = load_dataset(file_to_path('PYPL.csv'))
-    nflx_df = load_dataset(file_to_path('NFLX.csv'))
+    files = [
+       'CRM.csv',
+       'AMZN.csv',
+       'AMD.csv',
+       'PYPL.csv',
+       'NFLX.csv',
+       'NVDA.csv',
+       'ORCL.csv',
+       'BABA.csv',
+       'CSCO.csv',
+       'INTC.csv',
+       'QCOM.csv',
+       'UBER.csv',
+       ]
+    crm_df, amzn_df, amd_df, pypl_df, nflx_df, nvda_df, orcl_df, baba_df, csco_df, intc_df, qcom_df, uber_df = [load_dataset(file_to_path(file)) for file in files]
+
     window_size = 10
 
+    # Environment Length: 2 months (~45 trading days)
+    # Number of environments: 60
     return [
-        # KO training envs
-        create_env(env_type, ko_df, window_size, (10, 120), no_action_punishment=no_action_punishment),
-        create_env(env_type, ko_df, window_size, (120, 230), no_action_punishment=no_action_punishment),
-        create_env(env_type, ko_df, window_size, (350, 470), no_action_punishment=no_action_punishment),
-        create_env(env_type, ko_df, window_size, (1000, 1120), no_action_punishment=no_action_punishment),
-        create_env(env_type, ko_df, window_size, (1700, 1820), no_action_punishment=no_action_punishment),
+        # CRM training envs
+        create_env(env_type, crm_df, window_size, (200, 245), no_action_punishment=no_action_punishment),
+        create_env(env_type, crm_df, window_size, (300, 345), no_action_punishment=no_action_punishment),
+        create_env(env_type, crm_df, window_size, (500, 545), no_action_punishment=no_action_punishment),
+        create_env(env_type, crm_df, window_size, (545, 590), no_action_punishment=no_action_punishment),
+        create_env(env_type, crm_df, window_size, (600, 645), no_action_punishment=no_action_punishment),
 
         # AMZN training envs
-        create_env(env_type, amzn_df, window_size, (10, 120), no_action_punishment=no_action_punishment),
-        create_env(env_type, amzn_df, window_size, (120, 230), no_action_punishment=no_action_punishment),
-        create_env(env_type, amzn_df, window_size, (350, 470), no_action_punishment=no_action_punishment),
-        create_env(env_type, amzn_df, window_size, (1000, 1120), no_action_punishment=no_action_punishment),
-        create_env(env_type, amzn_df, window_size, (1700, 1820), no_action_punishment=no_action_punishment),
+        create_env(env_type, amzn_df, window_size, (1000, 1045), no_action_punishment=no_action_punishment),
+        create_env(env_type, amzn_df, window_size, (1200, 1245), no_action_punishment=no_action_punishment),
+        create_env(env_type, amzn_df, window_size, (1300, 1345), no_action_punishment=no_action_punishment),
+        create_env(env_type, amzn_df, window_size, (1400, 1445), no_action_punishment=no_action_punishment),
+        create_env(env_type, amzn_df, window_size, (1500, 1545), no_action_punishment=no_action_punishment),
 
         # AMD training envs
-        create_env(env_type, amd_df, window_size, (10, 120), no_action_punishment=no_action_punishment),
-        create_env(env_type, amd_df, window_size, (120, 230), no_action_punishment=no_action_punishment),
-        create_env(env_type, amd_df, window_size, (350, 470), no_action_punishment=no_action_punishment),
-        create_env(env_type, amd_df, window_size, (1000, 1120), no_action_punishment=no_action_punishment),
-        create_env(env_type, amd_df, window_size, (1700, 1820), no_action_punishment=no_action_punishment),
+        create_env(env_type, amd_df, window_size, (400, 445), no_action_punishment=no_action_punishment),
+        create_env(env_type, amd_df, window_size, (500, 545), no_action_punishment=no_action_punishment),
+        create_env(env_type, amd_df, window_size, (600, 645), no_action_punishment=no_action_punishment),
+        create_env(env_type, amd_df, window_size, (700, 745), no_action_punishment=no_action_punishment),
+        create_env(env_type, amd_df, window_size, (800, 845), no_action_punishment=no_action_punishment),
 
         # PYPL training envs
-        create_env(env_type, pypl_df, window_size, (10, 120), no_action_punishment=no_action_punishment),
-        create_env(env_type, pypl_df, window_size, (120, 230), no_action_punishment=no_action_punishment),
-        create_env(env_type, pypl_df, window_size, (350, 470), no_action_punishment=no_action_punishment),
-        create_env(env_type, pypl_df, window_size, (1000, 1120), no_action_punishment=no_action_punishment),
-        create_env(env_type, pypl_df, window_size, (1700, 1820), no_action_punishment=no_action_punishment),
+        create_env(env_type, pypl_df, window_size, (400, 445), no_action_punishment=no_action_punishment),
+        create_env(env_type, pypl_df, window_size, (500, 545), no_action_punishment=no_action_punishment),
+        create_env(env_type, pypl_df, window_size, (600, 645), no_action_punishment=no_action_punishment),
+        create_env(env_type, pypl_df, window_size, (700, 745), no_action_punishment=no_action_punishment),
+        create_env(env_type, pypl_df, window_size, (800, 845), no_action_punishment=no_action_punishment),
 
         # NFLX training envs
-        create_env(env_type, nflx_df, window_size, (10, 120), no_action_punishment=no_action_punishment),
-        create_env(env_type, nflx_df, window_size, (120, 230), no_action_punishment=no_action_punishment),
-        create_env(env_type, nflx_df, window_size, (350, 470), no_action_punishment=no_action_punishment),
-        create_env(env_type, nflx_df, window_size, (1000, 1120), no_action_punishment=no_action_punishment),
-        create_env(env_type, nflx_df, window_size, (1700, 1820), no_action_punishment=no_action_punishment),
+        create_env(env_type, nflx_df, window_size, (800, 845), no_action_punishment=no_action_punishment),
+        create_env(env_type, nflx_df, window_size, (900, 945), no_action_punishment=no_action_punishment),
+        create_env(env_type, nflx_df, window_size, (1000, 1045), no_action_punishment=no_action_punishment),
+        create_env(env_type, nflx_df, window_size, (1100, 1145), no_action_punishment=no_action_punishment),
+        create_env(env_type, nflx_df, window_size, (1200, 1245), no_action_punishment=no_action_punishment),
+
+        # NVDA training envs
+        create_env(env_type, nvda_df, window_size, (800, 845), no_action_punishment=no_action_punishment),
+        create_env(env_type, nvda_df, window_size, (900, 945), no_action_punishment=no_action_punishment),
+        create_env(env_type, nvda_df, window_size, (1000, 1045), no_action_punishment=no_action_punishment),
+        create_env(env_type, nvda_df, window_size, (1100, 1145), no_action_punishment=no_action_punishment),
+        create_env(env_type, nvda_df, window_size, (1200, 1245), no_action_punishment=no_action_punishment),
+
+        # ORCL training envs
+        create_env(env_type, orcl_df, window_size, (400, 445), no_action_punishment=no_action_punishment),
+        create_env(env_type, orcl_df, window_size, (500, 545), no_action_punishment=no_action_punishment),
+        create_env(env_type, orcl_df, window_size, (600, 645), no_action_punishment=no_action_punishment),
+        create_env(env_type, orcl_df, window_size, (700, 745), no_action_punishment=no_action_punishment),
+        create_env(env_type, orcl_df, window_size, (800, 845), no_action_punishment=no_action_punishment),
+
+        # BABA training envs
+        create_env(env_type, baba_df, window_size, (800, 845), no_action_punishment=no_action_punishment),
+        create_env(env_type, baba_df, window_size, (900, 945), no_action_punishment=no_action_punishment),
+        create_env(env_type, baba_df, window_size, (1000, 1045), no_action_punishment=no_action_punishment),
+        create_env(env_type, baba_df, window_size, (1100, 1145), no_action_punishment=no_action_punishment),
+        create_env(env_type, baba_df, window_size, (1200, 1245), no_action_punishment=no_action_punishment),
+
+        # CSCO training envs
+        create_env(env_type, csco_df, window_size, (400, 445), no_action_punishment=no_action_punishment),
+        create_env(env_type, csco_df, window_size, (500, 545), no_action_punishment=no_action_punishment),
+        create_env(env_type, csco_df, window_size, (600, 645), no_action_punishment=no_action_punishment),
+        create_env(env_type, csco_df, window_size, (700, 745), no_action_punishment=no_action_punishment),
+        create_env(env_type, csco_df, window_size, (800, 845), no_action_punishment=no_action_punishment),
+
+        # INTC training envs
+        create_env(env_type, intc_df, window_size, (800, 845), no_action_punishment=no_action_punishment),
+        create_env(env_type, intc_df, window_size, (900, 945), no_action_punishment=no_action_punishment),
+        create_env(env_type, intc_df, window_size, (1000, 1045), no_action_punishment=no_action_punishment),
+        create_env(env_type, intc_df, window_size, (1100, 1145), no_action_punishment=no_action_punishment),
+        create_env(env_type, intc_df, window_size, (1200, 1245), no_action_punishment=no_action_punishment),
+
+        # QCOM training envs
+        create_env(env_type, qcom_df, window_size, (400, 445), no_action_punishment=no_action_punishment),
+        create_env(env_type, qcom_df, window_size, (500, 545), no_action_punishment=no_action_punishment),
+        create_env(env_type, qcom_df, window_size, (600, 645), no_action_punishment=no_action_punishment),
+        create_env(env_type, qcom_df, window_size, (700, 745), no_action_punishment=no_action_punishment),
+        create_env(env_type, qcom_df, window_size, (800, 845), no_action_punishment=no_action_punishment),
+
+        # UBER training envs
+        create_env(env_type, uber_df, window_size, (800, 845), no_action_punishment=no_action_punishment),
+        create_env(env_type, uber_df, window_size, (900, 945), no_action_punishment=no_action_punishment),
+        create_env(env_type, uber_df, window_size, (1000, 1045), no_action_punishment=no_action_punishment),
+        create_env(env_type, uber_df, window_size, (1100, 1145), no_action_punishment=no_action_punishment),
+        create_env(env_type, uber_df, window_size, (1200, 1245), no_action_punishment=no_action_punishment),
     ]
 
 
@@ -84,15 +146,15 @@ def create_testing_env(env_type: str, no_action_punishment=0):
     def file_to_path(file):
         return path.join(path.dirname(__file__), f'stocks_data/{file}')
     
-    ko_df = load_dataset(file_to_path('KO.csv'))
+    ko_df = load_dataset(file_to_path('TSLA.csv'))
     window_size = 10
-    return create_env(env_type, ko_df, window_size, (2000, 2300), no_action_punishment=no_action_punishment)
+    return create_env(env_type, ko_df, window_size, (1180, 1225), no_action_punishment=no_action_punishment)
 
 
 # ====================================== Random Picker ======================================
 
 class BufferedRandomPicker:
-  def __init__(self, values, buff_len=5):
+  def __init__(self, values, buff_len=20):
     '''Create a new BufferedRandomPicker instance
     :param values: list: The list of values to pick from
     :param buff_len: int: The length of the buffer
@@ -141,4 +203,3 @@ def random_train_env_getter(no_action_punishment=0):
         env = picker.pick_random()
         return env
     return get_random_train_env
-

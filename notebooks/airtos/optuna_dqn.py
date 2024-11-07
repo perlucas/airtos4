@@ -27,7 +27,7 @@ LOG_DIR = os.path.join(
     EXECUTION_ID
 )
 
-PARAM_NUM_ITERATIONS = 6000
+PARAM_NUM_ITERATIONS = 7000
 PARAM_COLLECT_STEPS_PER_ITERATION = 250
 PARAM_LOG_INTERVAL_EPISODES = 10
 PARAM_EVAL_INTERVAL_EPISODES = 25
@@ -59,8 +59,11 @@ class SwitchEnvWrapper(gymnasium.Wrapper):
 
 # =============================== Init and Run Tuner ===============================================
 RUNS_PER_TRIAL = 3
+best_mean = 1000
 
 def objective(trial):
+    global best_mean
+    
     learning_rate = trial.suggest_loguniform("learning_rate", 1e-7, 1e-2)
     
     num_layers = trial.suggest_categorical("num_layers", [3, 4, 5, 8, 12])
@@ -84,7 +87,7 @@ def objective(trial):
             tensorboard_log=LOG_DIR)
     
     def train_model(model):
-        callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=8300, verbose=1)
+        callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=4000, verbose=1)
         stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=5, min_evals=10, verbose=1)
         eval_callback = EvalCallback(
             eval_env,
@@ -103,9 +106,15 @@ def objective(trial):
     for _ in range(RUNS_PER_TRIAL):
         model = get_model()
         train_model(model)
-        eval_results = evaluate_policy(model, eval_env, n_eval_episodes=2)
-        total_eval_results.append(eval_results[0])
+        mean, _unused = evaluate_policy(model, eval_env, n_eval_episodes=2)
+        total_eval_results.append(mean)
         model.logger.close()
+
+        if mean > best_mean:
+            best_mean = mean
+            model.save(os.path.join(LOG_DIR, f'model_{trial.number}.zip'))
+            print(f'New best model saved with mean return: {mean}, trial: {trial.number}')
+
         model = None
     
     return sum(total_eval_results) / len(total_eval_results)

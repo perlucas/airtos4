@@ -3,6 +3,7 @@ class TradingSession:
     def __init__(self, fee = 0):
         self._shorts = []
         self._longs = []
+        self.budget = 0
 
         assert fee >= 0
         self._fee = fee
@@ -122,6 +123,13 @@ class TradingSession:
             self.__add_short((price, remaining_to_sell))
         
         return profit - discount
+    
+    def check_stop_loss(self, price):
+        '''Check if the current price hits the stop loss for any of the open positions.
+        Close the position if the stop loss is hit.
+        Not implemented in base class.
+        '''
+        return
 
     def end_session(self, price):
         '''End the current trading session at the ending price. Calculate profits based

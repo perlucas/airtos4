@@ -151,6 +151,20 @@ def create_testing_env(env_type: str, no_action_punishment=0):
     return create_env(env_type, ko_df, window_size, (1180, 1225), no_action_punishment=no_action_punishment)
 
 
+def create_custom_env(ticker: str, frame_bound: tuple, no_action_punishment=0):
+    '''Create a custom environment based on the ticker and frame bound
+    :param ticker: str: The ticker of the stock to use
+    :param frame_bound: tuple[int, int]: The frame bound to use for the environment
+    :return: CombinedEnv: The custom environment created
+    '''
+    def file_to_path(file):
+        return path.join(path.dirname(__file__), f'stocks_data/{file}')
+    
+    df = load_dataset(file_to_path(f'{ticker}.csv'))
+    window_size = 10
+    return create_env(ENV_TYPE, df, window_size, frame_bound, no_action_punishment=no_action_punishment)
+
+
 # ====================================== Random Picker ======================================
 
 class BufferedRandomPicker:

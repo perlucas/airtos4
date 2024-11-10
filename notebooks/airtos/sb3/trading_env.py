@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from gymnasium import spaces
 
 from envs.trading_session import TradingSession
+from envs.budged_trading_session import BudgedTradingSession
 
 
 # Possible Actions the agent can choose
@@ -90,6 +91,7 @@ class TradingEnv(gym.Env):
         self._punishment_on_no_action = no_action_punishment
         self._cumulated_punish_counter = 0
         self._session = TradingSession(fee = 2)
+        # self._session = BudgedTradingSession(fee = 2, initial_budget = 50000, stop_loss = 0.2)
 
 
     def _get_observation(self):
@@ -106,6 +108,7 @@ class TradingEnv(gym.Env):
         return {
             "profit": self._profit,
             "progress": self._current_tick / self._end_tick,
+            "budget": self._session.budget,
         }
 
     def reset(self, seed=None, options=None):
@@ -134,7 +137,11 @@ class TradingEnv(gym.Env):
 
         # Increase punishment on consecutive no actions
         self._cumulated_punish_counter += 1
+
+        # Check if stop loss is hit for any open position
+        self._session.check_stop_loss(current_price)
         
+        # Execute action
         if action == 'buy':
             step_reward = self._session.open_long(current_price, num_shares)
             self._cumulated_punish_counter = 0

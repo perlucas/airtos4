@@ -69,8 +69,8 @@ class TradingEnv(gym.Env):
 
         self.observation_space = spaces.Box(
             # Indicators are z-score normalized, theoretically, they should range from -3 to 3
-            low=-3e0,
-            high=3e0,
+            low=-1e0,
+            high=1e0,
             shape=(num_dimensions,), # Reshape into N-dim array for better support
             dtype=np.float32,
         )

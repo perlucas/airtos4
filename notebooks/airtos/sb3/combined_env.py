@@ -20,7 +20,7 @@ class CombinedEnv(TradingEnv):
         def z_score(values):
             mean = np.mean(values)
             std_dev = np.std(values)
-            return (values - mean) / std_dev
+            return ((values - mean) / std_dev) / 3 # Divide by 3 to keep values between -1 and 1
 
         # Compute 1st Indicator: Moving Averages
         ma1 = self.df.ta.ema(length=20).to_numpy()

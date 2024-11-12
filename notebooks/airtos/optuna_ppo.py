@@ -58,16 +58,14 @@ class SwitchEnvWrapper(gymnasium.Wrapper):
 
 
 # =============================== Init and Run Tuner ===============================================
-RUNS_PER_TRIAL = 5
-best_mean = 1000
+RUNS_PER_TRIAL = 3
 
 def objective(trial):
-    global best_mean
     
     learning_rate = trial.suggest_loguniform("learning_rate", 1e-6, 1e-5)
     
-    num_layers = trial.suggest_categorical("num_layers", [4, 6, 8, 10, 12])
-    layer_units = trial.suggest_categorical("layer_units", [10, 25, 50, 75, 100, 200])
+    num_layers = trial.suggest_categorical("num_layers", [4, 8, 10])
+    layer_units = trial.suggest_categorical("layer_units", [25, 50, 100])
     layers_list = [layer_units] * num_layers
     policy_kwargs = dict(net_arch=layers_list)
 
@@ -107,8 +105,7 @@ def objective(trial):
         total_eval_results.append(mean)
         model.logger.close()
 
-        if mean > best_mean:
-            best_mean = mean
+        if mean > 700:
             model.save(os.path.join(LOG_DIR, f'trial_{trial.number}_best_model'))
             print(f'New best model saved with mean return: {mean}, trial: {trial.number}')
 
@@ -117,6 +114,6 @@ def objective(trial):
     return sum(total_eval_results) / len(total_eval_results)
 
 study = optuna.create_study(direction="maximize")
-study.optimize(objective, n_trials=1000, n_jobs=1)
+study.optimize(objective, n_trials=300, n_jobs=1)
 
 print('Finished!')

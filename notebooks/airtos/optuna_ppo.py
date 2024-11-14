@@ -71,7 +71,7 @@ def objective(trial):
 
     activation_fn = trial.suggest_categorical("activation_fn", ["ReLU", "LeakyReLU", "ELU"])
 
-    policy_kwargs = dict(net_arch=layers_list, activation_fn=getattr(nn, activation_fn)())
+    policy_kwargs = dict(net_arch=layers_list, activation_fn=getattr(nn, activation_fn))
 
     normalize_advantage = trial.suggest_categorical("normalize_advantage", [True, False])
 

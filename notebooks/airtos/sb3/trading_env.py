@@ -91,7 +91,7 @@ class TradingEnv(gym.Env):
         self._punishment_on_no_action = no_action_punishment
         self._cumulated_punish_counter = 0
         self._session = TradingSession(fee = 2)
-        # self._session = BudgedTradingSession(fee = 2, initial_budget = 500, stop_loss = 0.05)
+        # self._session = BudgedTradingSession(fee = 2, initial_budget = 500)
 
 
     def _get_observation(self):

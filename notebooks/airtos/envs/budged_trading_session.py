@@ -1,6 +1,6 @@
 class BudgedTradingSession:
 
-    def __init__(self, fee = 0, initial_budget = 1000, stop_loss = None):
+    def __init__(self, fee = 0, initial_budget = 1000, stop_loss = None, take_profit = None):
         self._shorts = []
         self._longs = []
 
@@ -12,6 +12,7 @@ class BudgedTradingSession:
         self._fee = fee
 
         self._stop_loss = stop_loss
+        self._take_profit = take_profit
 
     def reset(self):
         '''Reset the porftolio removing all longs and shorts
@@ -69,27 +70,30 @@ class BudgedTradingSession:
                 # if oldest short has the same num of shares that this long needs, close it and compute profit
                 self.__remove_oldest_short()
                 profit += (short_price - price) * remaining_to_buy
+                self.budget += (short_price - price) * remaining_to_buy
                 remaining_to_buy = 0
                 break
             elif short_shares < remaining_to_buy:
                 # if oldest short's shares is less than the required, close it and continue with the next
                 self.__remove_oldest_short()
                 profit =+ (short_price - price) * short_shares
+                self.budget += (short_price - price) * short_shares
                 remaining_to_buy -= short_shares
             else:
                 # if oldest short's shares is greater than the required, partially close the short
                 new_short_shares = short_shares - remaining_to_buy
                 profit += (short_price - price) * remaining_to_buy
+                self.budget += (short_price - price) * remaining_to_buy
                 remaining_to_buy = 0
                 self.__overwrite_oldest_short((short_price, new_short_shares))
                 break
 
         # add long if couldn't buy all the shares
         if remaining_to_buy > 0:
-            self.budget -= price * remaining_to_buy
+            self.budget -= (price * remaining_to_buy)
             self.__add_long((price, remaining_to_buy))
         
-        self.budget += profit - discount
+        self.budget -= discount
         return profit - discount
 
     def open_short(self, price, num_shares):
@@ -110,6 +114,7 @@ class BudgedTradingSession:
                 # if oldest long has the same num of shares that this short needs, close it and compute profit
                 self.__remove_oldest_long()
                 profit += (price - long_price) * remaining_to_sell
+                self.budget += (price - long_price) * remaining_to_sell
                 discount += price * remaining_to_sell * (self._fee/100) # Apply fee
                 remaining_to_sell = 0
                 break
@@ -117,12 +122,14 @@ class BudgedTradingSession:
                 # if oldest long's shares is less than the required, close it and continue with the next
                 self.__remove_oldest_long()
                 profit =+ (price - long_price) * long_shares
+                self.budget += (price - long_price) * long_shares
                 discount += price * long_shares * (self._fee/100) # Apply fee
                 remaining_to_sell -= long_shares
             else:
                 # if oldest long's shares is greater than the required, partially close the long
                 new_long_shares = long_shares - remaining_to_sell
                 profit += (price - long_price) * remaining_to_sell
+                self.budget += (price - long_price) * remaining_to_sell
                 discount += price * remaining_to_sell * (self._fee/100) # Apply fee
                 remaining_to_sell = 0
                 self.__overwrite_oldest_long((long_price, new_long_shares))
@@ -130,28 +137,42 @@ class BudgedTradingSession:
 
         # add short if couldn't sell all the shares
         if remaining_to_sell > 0:
-            remaining_to_sell = min(remaining_to_sell, self.budget // (price * 0.3))
             discount += price * remaining_to_sell * (self._fee/100)
             self.__add_short((price, remaining_to_sell))
         
-        self.budget += profit - discount
+        self.budget -= discount
         return profit - discount
 
     def check_stop_loss(self, price):
-        if self._stop_loss is None:
-            return
-        
-        for i, values in enumerate(self._longs):
-            close_price, shares = values
-            if price/close_price < 1 - self._stop_loss:
-                self.budget += (price - close_price) * shares * (self._fee/100)
-                self._longs.pop(i)
+        if self._stop_loss is not None:
+            for i, values in enumerate(self._longs):
+                close_price, shares = values
+                if price/close_price < 1 - self._stop_loss:
+                    self.budget += (price - close_price) * shares
+                    self.budget -= (price * shares * (self._fee/100))
+                    self._longs.pop(i)
 
-        for i, values in enumerate(self._shorts):
-            close_price, shares = values
-            if close_price/price < 1 - self._stop_loss:
-                self.budget += (close_price - price) * shares * (self._fee/100)
-                self._shorts.pop(i)
+            for i, values in enumerate(self._shorts):
+                close_price, shares = values
+                if close_price/price < 1 - self._stop_loss:
+                    self.budget += (close_price - price) * shares
+                    self.budget -= (price * shares * (self._fee/100))
+                    self._shorts.pop(i)
+
+        if self._take_profit is not None:
+            for i, values in enumerate(self._longs):
+                close_price, shares = values
+                if price/close_price > 1 + self._take_profit:
+                    self.budget += (price - close_price) * shares
+                    self.budget -= (price * shares * (self._fee/100))
+                    self._longs.pop(i)
+
+            for i, values in enumerate(self._shorts):
+                close_price, shares = values
+                if close_price/price > 1 + self._take_profit:
+                    self.budget += (close_price - price) * shares
+                    self.budget -= (price * shares * (self._fee/100))
+                    self._shorts.pop(i)
         
 
     def end_session(self, price):

@@ -12,6 +12,7 @@ from stable_baselines3 import A2C
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement
 from stable_baselines3.common.evaluation import evaluate_policy
 import optuna
+import torch.nn as nn
 
 from utils.envs.sb3 import testing_env, random_train_env_getter
 
@@ -67,7 +68,12 @@ def objective(trial):
     num_layers = trial.suggest_categorical("num_layers", [4, 8, 10])
     layer_units = trial.suggest_categorical("layer_units", [25, 50, 100])
     layers_list = [layer_units] * num_layers
-    policy_kwargs = dict(net_arch=layers_list)
+
+    activation_fn = trial.suggest_categorical("activation_fn", ["ReLU", "LeakyReLU", "ELU"])
+
+    policy_kwargs = dict(net_arch=layers_list, activation_fn=getattr(nn, activation_fn)())
+
+    normalize_advantage = trial.suggest_categorical("normalize_advantage", [True, False])
 
     env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
     def get_model():
@@ -78,10 +84,11 @@ def objective(trial):
             policy_kwargs=policy_kwargs,
             gamma=0.99,
             seed=42,
+            normalize_advantage=normalize_advantage,
             tensorboard_log=LOG_DIR)
     
     def train_model(model):
-        callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=4000, verbose=1)
+        callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=550, verbose=1)
         stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=5, min_evals=10, verbose=1)
         eval_callback = EvalCallback(
             eval_env,
@@ -104,7 +111,7 @@ def objective(trial):
         total_eval_results.append(mean)
         model.logger.close()
 
-        if mean > 1000:
+        if mean > 550:
             model.save(os.path.join(LOG_DIR, f'trial_{trial.number}_best_model'))
             print(f'New best model saved with mean return: {mean}, trial: {trial.number}')
 

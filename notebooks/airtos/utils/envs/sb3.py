@@ -146,9 +146,9 @@ def create_testing_env(env_type: str, no_action_punishment=0):
     def file_to_path(file):
         return path.join(path.dirname(__file__), f'stocks_data/{file}')
     
-    ko_df = load_dataset(file_to_path('TSLA.csv'))
+    ko_df = load_dataset(file_to_path('PYPL.csv'))
     window_size = 10
-    return create_env(env_type, ko_df, window_size, (1180, 1225), no_action_punishment=no_action_punishment)
+    return create_env(env_type, ko_df, window_size, (1100, 1145), no_action_punishment=no_action_punishment)
 
 
 def create_custom_env(ticker: str, frame_bound: tuple, no_action_punishment=0):

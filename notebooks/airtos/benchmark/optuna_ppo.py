@@ -1,11 +1,11 @@
 # Preparation to use gymnasium for SB3
 # This should be before any SB# import
 import sys
+import os
 import gymnasium
 sys.modules["gym"] = gymnasium
 # End of preparation
 
-import os
 from datetime import datetime
 
 from stable_baselines3 import PPO
@@ -14,11 +14,13 @@ from stable_baselines3.common.evaluation import evaluate_policy
 import optuna
 import torch.nn as nn
 
-from utils.envs.sb3 import testing_env, random_train_env_getter
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from utils.envs.sb3 import testing_env
 
 
 eval_env = testing_env(no_action_punishment=0)
-get_random_train_env = random_train_env_getter(no_action_punishment=0)
+# get_random_train_env = random_train_env_getter(no_action_punishment=0)
 
 # =============================== General parameters ===============================================
 EXECUTION_ID = datetime.now().strftime('%Y-%m-%d_%H%M%S')
@@ -35,27 +37,26 @@ PARAM_EVAL_INTERVAL_EPISODES = 25
 PARAM_SWITCH_ENV_INTERVAL = 5 * PARAM_COLLECT_STEPS_PER_ITERATION
 
 # =============================== Switch Environment Wrapper ==============================
-class SwitchEnvWrapper(gymnasium.Wrapper):
+# class SwitchEnvWrapper(gymnasium.Wrapper):
     
-    def __init__(self, env, switch_interval):
-        super().__init__(env)
-        self.switch_interval = switch_interval
-        self.should_switch = False
-        self.n_steps = 0
+#     def __init__(self, env, switch_interval):
+#         super().__init__(env)
+#         self.switch_interval = switch_interval
+#         self.should_switch = False
+#         self.n_steps = 0
 
-    def step(self, action):
-        obs, reward, done, truncated, info = self.env.step(action)
-        self.n_steps += 1
+#     def step(self, action):
+#         obs, reward, done, truncated, info = self.env.step(action)
+#         self.n_steps += 1
 
-        if self.n_steps % self.switch_interval == 0:
-            self.should_switch = True
+#         if self.n_steps % self.switch_interval == 0:
+#             self.should_switch = True
 
-        if done and self.should_switch:
-            self.should_switch = False
-            self.env = get_random_train_env()
-            # print(f'Switched environment at step {self.n_steps}')
+#         if done and self.should_switch:
+#             self.should_switch = False
+#             self.env = get_random_train_env()
         
-        return obs, reward, done, truncated, info
+#         return obs, reward, done, truncated, info
 
 
 # =============================== Init and Run Tuner ===============================================
@@ -73,10 +74,8 @@ def objective(trial):
 
     policy_kwargs = dict(net_arch=layers_list, activation_fn=getattr(nn, activation_fn))
 
-    normalize_advantage = trial.suggest_categorical("normalize_advantage", [True, False])
+    env = testing_env(no_action_punishment=0) # For benchmark only
 
-
-    env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
     def get_model():
         return PPO(
             'MlpPolicy',
@@ -86,12 +85,12 @@ def objective(trial):
             gamma=0.99,
             batch_size=128,
             seed=42,
-            normalize_advantage=normalize_advantage,
+            normalize_advantage=True,
             tensorboard_log=LOG_DIR)
     
     def train_model(model):
         callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=550, verbose=1)
-        stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=10, verbose=1)
+        stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=5, min_evals=10, verbose=1)
         eval_callback = EvalCallback(
             eval_env,
             n_eval_episodes=2,
@@ -109,6 +108,7 @@ def objective(trial):
     for _ in range(RUNS_PER_TRIAL):
         model = get_model()
         train_model(model)
+
         mean, _unused = evaluate_policy(model, eval_env, n_eval_episodes=2)
         total_eval_results.append(mean)
         model.logger.close()

@@ -65,7 +65,7 @@ def objective(trial):
     
     learning_rate = trial.suggest_loguniform("learning_rate", 1e-8, 1e-6)
     
-    num_layers = trial.suggest_categorical("num_layers", [4, 8, 10])
+    num_layers = trial.suggest_categorical("num_layers", [2, 4, 8, 10, 15])
     layer_units = trial.suggest_categorical("layer_units", [25, 50, 100])
     layers_list = [layer_units] * num_layers
 
@@ -89,7 +89,7 @@ def objective(trial):
     
     def train_model(model):
         callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=550, verbose=1)
-        stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=5, min_evals=10, verbose=1)
+        stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=10, verbose=1)
         eval_callback = EvalCallback(
             eval_env,
             n_eval_episodes=2,
@@ -111,7 +111,7 @@ def objective(trial):
         total_eval_results.append(mean)
         model.logger.close()
 
-        if mean > 550:
+        if mean > 500:
             model.save(os.path.join(LOG_DIR, f'trial_{trial.number}_best_model'))
             print(f'New best model saved with mean return: {mean}, trial: {trial.number}')
 

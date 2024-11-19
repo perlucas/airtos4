@@ -12,10 +12,11 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement
 from stable_baselines3.common.evaluation import evaluate_policy
 
-from utils.envs.sb3 import testing_env, random_train_env_getter
+from utils.envs.sb3 import testing_env, random_train_env_getter, create_custom_env
 
 # =============================== General parameters ===============================================
 eval_env = testing_env(no_action_punishment=0)
+# eval_env = create_custom_env('PYPL', (1200, 1245), no_action_punishment=0)
 get_random_train_env = random_train_env_getter(no_action_punishment=0)
 
 EXECUTION_ID = datetime.now().strftime('%Y-%m-%d_%H%M%S')
@@ -54,8 +55,8 @@ class SwitchEnvWrapper(gymnasium.Wrapper):
         return obs, reward, done, truncated, info
 
 # Hyperparameters
-layers_list = [8] * 100
-learning_rate = 3.8e-6
+layers_list = [4] * 50
+learning_rate = 3e-6
 
 policy_kwargs = dict(net_arch=layers_list)
 
@@ -70,7 +71,8 @@ policy_kwargs = dict(net_arch=layers_list)
 # learning_rate=lr_schedule
 
 # Create model
-env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
+# env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
+env = testing_env(no_action_punishment=2)
 
 def get_model():
     return PPO(
@@ -83,15 +85,16 @@ def get_model():
         # seed=42,
         # ent_coef=0.00615,
         # clip_range=0.228,
+        normalize_advantage=True,
         tensorboard_log=LOG_DIR)
 
 
 best_mean = 0
-for i in range(10):
+for i in range(3):
     model = get_model()
     
     # SB3 callback to evaluate the policy and log in TB
-    callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=8500, verbose=1)
+    callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=550, verbose=1)
     stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=10, verbose=1)
     eval_callback = EvalCallback(
         eval_env,

@@ -8,7 +8,7 @@ sys.modules["gym"] = gymnasium
 import os
 from datetime import datetime
 
-from stable_baselines3 import DQN
+from sb3_contrib import QRDQN
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold, StopTrainingOnNoModelImprovement
 from stable_baselines3.common.evaluation import evaluate_policy
 import optuna
@@ -76,7 +76,7 @@ def objective(trial):
     env = testing_env(no_action_punishment=0)
 
     def get_model():
-        return DQN(
+        return QRDQN(
             'MlpPolicy',
             env,
             learning_rate=learning_rate,

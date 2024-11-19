@@ -143,10 +143,10 @@ class TradingEnv(gym.Env):
         
         # Execute action
         if action == 'buy':
-            step_reward = self._session.open_long(current_price, num_shares)
+            _, step_reward = self._session.open_long(current_price, num_shares)
             self._cumulated_punish_counter = 0
         elif action == 'sell':
-            step_reward = self._session.open_short(current_price, num_shares)
+            _, step_reward = self._session.open_short(current_price, num_shares)
             self._cumulated_punish_counter = 0
 
         # Add punishment for no action
@@ -164,7 +164,8 @@ class TradingEnv(gym.Env):
         if self._current_tick == self._end_tick:
             # Finish episode if reached last tick
             episode_ended = True
-            self._profit += self._session.end_session(current_price)
+            _, final_reward = self._session.end_session(current_price)
+            self._profit += final_reward
 
         observation = self._get_observation()
 

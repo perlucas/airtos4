@@ -112,7 +112,7 @@ def objective(trial):
         total_eval_results.append(mean)
         model.logger.close()
 
-        if mean > 500:
+        if mean > 100:
             model.save(os.path.join(LOG_DIR, f'trial_{trial.number}_best_model'))
             print(f'New best model saved with mean return: {mean}, trial: {trial.number}')
 

@@ -55,6 +55,9 @@ class TradingSession:
         remaining_to_buy = num_shares
         profit = 0
 
+        perc_profit = -1 * self._fee * num_shares # profit expressed as %
+        perc_shares = 0
+
         while remaining_to_buy > 0 and self.__has_shorts():
             short = self.__oldest_short()
             short_price, short_shares = short
@@ -63,17 +66,23 @@ class TradingSession:
                 # if oldest short has the same num of shares that this long needs, close it and compute profit
                 self.__remove_oldest_short()
                 profit += (short_price - price) * remaining_to_buy
+                perc_profit += ((short_price - price)/price) * 100 * remaining_to_buy
+                perc_shares += remaining_to_buy
                 remaining_to_buy = 0
                 break
             elif short_shares < remaining_to_buy:
                 # if oldest short's shares is less than the required, close it and continue with the next
                 self.__remove_oldest_short()
                 profit =+ (short_price - price) * short_shares
+                perc_profit += ((short_price - price)/price) * 100 * short_shares
+                perc_shares += short_shares
                 remaining_to_buy -= short_shares
             else:
                 # if oldest short's shares is greater than the required, partially close the short
                 new_short_shares = short_shares - remaining_to_buy
                 profit += (short_price - price) * remaining_to_buy
+                perc_profit += ((short_price - price)/price) * 100 * remaining_to_buy
+                perc_shares += remaining_to_buy
                 remaining_to_buy = 0
                 self.__overwrite_oldest_short((short_price, new_short_shares))
                 break
@@ -82,7 +91,7 @@ class TradingSession:
         if remaining_to_buy > 0:
             self.__add_long((price, remaining_to_buy))
         
-        return profit - discount
+        return (profit - discount), (perc_profit/perc_shares) if perc_shares > 0 else perc_profit
 
     def open_short(self, price, num_shares):
         '''Open a new short position or close the oldest long currently active if it meets the required num of shares.
@@ -95,6 +104,9 @@ class TradingSession:
         remaining_to_sell = num_shares
         profit = 0
 
+        perc_profit = -1 * self._fee * num_shares # profit expressed as %
+        perc_shares = 0
+
         while remaining_to_sell > 0 and self.__has_longs():
             long = self.__oldest_long()
             long_price, long_shares = long
@@ -103,17 +115,23 @@ class TradingSession:
                 # if oldest long has the same num of shares that this short needs, close it and compute profit
                 self.__remove_oldest_long()
                 profit += (price - long_price) * remaining_to_sell
+                perc_profit += ((price - long_price)/long_price) * 100 * remaining_to_sell
+                perc_shares += remaining_to_sell
                 remaining_to_sell = 0
                 break
             elif long_shares < remaining_to_sell:
                 # if oldest long's shares is less than the required, close it and continue with the next
                 self.__remove_oldest_long()
                 profit =+ (price - long_price) * long_shares
+                perc_profit += ((price - long_price)/long_price) * 100 * long_shares
+                perc_shares += long_shares
                 remaining_to_sell -= long_shares
             else:
                 # if oldest long's shares is greater than the required, partially close the long
                 new_long_shares = long_shares - remaining_to_sell
                 profit += (price - long_price) * remaining_to_sell
+                perc_profit += ((price - long_price)/long_price) * 100 * remaining_to_sell
+                perc_shares += remaining_to_sell
                 remaining_to_sell = 0
                 self.__overwrite_oldest_long((long_price, new_long_shares))
                 break
@@ -122,7 +140,7 @@ class TradingSession:
         if remaining_to_sell > 0:
             self.__add_short((price, remaining_to_sell))
         
-        return profit - discount
+        return (profit - discount), (perc_profit/perc_shares) if perc_shares > 0 else perc_profit
     
     def check_stop_loss(self, price):
         '''Check if the current price hits the stop loss for any of the open positions.
@@ -139,6 +157,8 @@ class TradingSession:
         
         profit = 0
         discount = self._fee/100 # Apply fee
+        perc_profit = 0
+        num_shares = 0
         
         if self.__has_shorts():
             # Close remaining shorts by doing a long for each
@@ -146,6 +166,9 @@ class TradingSession:
                 short_price, short_shares = short
                 profit += (short_price - price) * short_shares
                 profit -= (price * short_shares * discount)
+                perc_profit += ((short_price - price)/price) * 100 * short_shares
+                perc_profit -= self._fee * short_shares
+                num_shares += short_shares
             self._shorts = []
 
         if self.__has_longs():
@@ -154,9 +177,12 @@ class TradingSession:
                 long_price, long_shares = long
                 profit += (price - long_price) * long_shares
                 profit -= (price * long_shares * discount)
+                perc_profit += ((price - long_price)/long_price) * 100 * long_shares
+                perc_profit -= self._fee * long_shares
+                num_shares += long_shares
             self._longs = []
         
-        return profit
+        return profit, (perc_profit/num_shares) if num_shares > 0 else 0
 
 
 

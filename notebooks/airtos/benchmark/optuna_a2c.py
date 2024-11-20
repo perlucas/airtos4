@@ -64,7 +64,7 @@ RUNS_PER_TRIAL = 3
 
 def objective(trial):
     
-    learning_rate = trial.suggest_loguniform("learning_rate", 1e-8, 1e-6)
+    learning_rate = trial.suggest_loguniform("learning_rate", 1e-8, 1e-4)
     
     num_layers = trial.suggest_categorical("num_layers", [2, 4, 8, 10, 15])
     layer_units = trial.suggest_categorical("layer_units", [25, 50, 100])

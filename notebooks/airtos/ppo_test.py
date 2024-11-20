@@ -56,7 +56,7 @@ class SwitchEnvWrapper(gymnasium.Wrapper):
 
 # Hyperparameters
 layers_list = [4] * 50
-learning_rate = 3e-6
+learning_rate = 3e-5
 
 policy_kwargs = dict(net_arch=layers_list)
 

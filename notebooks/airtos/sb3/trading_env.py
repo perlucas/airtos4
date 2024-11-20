@@ -10,27 +10,19 @@ from envs.budged_trading_session import BudgedTradingSession
 
 # Possible Actions the agent can choose
 ACTION_NOOP = 0
-ACTION_BUY_LOW = 1
-ACTION_BUY_MEDIUM = 2
-ACTION_BUY_HIGH = 3
-ACTION_SELL_LOW = 4
-ACTION_SELL_MEDIUM = 5
-ACTION_SELL_HIGH = 6
+ACTION_BUY = 1
+ACTION_SELL = 2
 
 _MIN_ACTION = ACTION_NOOP
-_MAX_ACTION = ACTION_SELL_HIGH
+_MAX_ACTION = ACTION_SELL
 
 # Posible number of shares the agent can trade: 5 shares, 10 shares or 20 shares
 def extract_action_and_num_shares(code):
     """Extract the action and number of shares from the encoded action"""
     code_action_map = [
         ('noop', 0),  # No op
-        ('buy', 5),   # buy low
-        ('buy', 10),  # buy medium
-        ('buy', 20),  # buy high
-        ('sell', 5),  # sell low
-        ('sell', 10), # sell medium
-        ('sell', 20), # sell high
+        ('buy', 1),   # buy
+        ('sell', 1),  # sell
     ]
     return code_action_map[code]
 
@@ -194,12 +186,8 @@ class TradingEnv(gym.Env):
 
         COLOR_CODES = {
             ACTION_NOOP: None,
-            ACTION_BUY_LOW: '#9ce612', # light green
-            ACTION_BUY_MEDIUM: '#57b01c', # green
-            ACTION_BUY_HIGH: '#2a540e', # dark green
-            ACTION_SELL_LOW: '#fa6664', # light red
-            ACTION_SELL_MEDIUM: '#e6110e', # red
-            ACTION_SELL_HIGH: '#730f0e', # dark red
+            ACTION_BUY: '#57b01c', # green
+            ACTION_SELL: '#e6110e', # red
         }
 
         plt.cla()

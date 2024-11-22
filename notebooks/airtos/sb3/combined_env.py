@@ -1,3 +1,4 @@
+import pandas as pd
 import pandas_ta as ta
 import numpy as np
 
@@ -20,6 +21,8 @@ class CombinedEnv(TradingEnv):
         def z_score(values):
             mean = np.mean(values)
             std_dev = np.std(values)
+            if std_dev == 0:
+                return np.zeros_like(values)
             return ((values - mean) / std_dev) / 3 # Divide by 3 to keep values between -1 and 1
 
         # Compute 1st Indicator: Moving Averages
@@ -62,6 +65,54 @@ class CombinedEnv(TradingEnv):
         volume_z = z_score(volume)
 
         features = np.column_stack((ma1_z, ma2_z, ma3_z, rsi_z, adx_z, macd_z, volume_z))
+
+        # Compute the custom TP/SL convenience indicators
+        # Compute X: percentage change from previous price
+        X = self.df.loc[:, 'Close'].pct_change()
+        X.iloc[0] = 0   # First value will be 0, since there is no previous value
+
+        # Define parameters for the algorithm
+        TP = 0.1      # Take Profit (10%)
+        SL = 0.05      # Stop Loss (5%)
+        W = 15    # Window size (look ahead W ticks)
+        MAX_OFFSET = len(self.df)  # Maximum offset (use the length of the data as the limit)
         
+        # Algorithm for calculating the 'B' indicator
+        def calculate_B(i, X, TP, SL, W, MAX_OFFSET):
+            t = 1
+            for j in range(i + 1, min(i + W, MAX_OFFSET)):  # Loop within window size or MAX_OFFSET
+                t *= (1 + X[j])
+                if t - 1 >= TP or t - 1 <= -SL:
+                    return t - 1  # Return the profit/loss if the threshold is met
+            return t - 1  # If the loop completes, return the final value of t - 1
+        
+        # Algorithm for calculating the 'S' indicator
+        def calculate_S(i, X, TP, SL, W, MAX_OFFSET):
+            t = 1
+            for j in range(i + 1, min(i + W, MAX_OFFSET)):  # Loop within window size or MAX_OFFSET
+                t *= (1 - X[j])
+                if t - 1 >= TP or t - 1 <= -SL:
+                    return t - 1  # Return the profit/loss if the threshold is met
+            return t - 1  # If the loop completes, return the final value of t - 1
+
+        # Apply the function to calculate the 'B' and 'S' indicators for each index
+        B = []
+        S = []
+        for idx, _ in X.items():
+            B.append(calculate_B(idx, X, TP, SL, W, MAX_OFFSET))
+            S.append(calculate_S(idx, X, TP, SL, W, MAX_OFFSET))
+
+        # Convert the result into a pandas Series (if needed)
+        self.B = pd.Series(B, index=X.index).to_numpy()[self.frame_bound[0] - self.window_size: self.frame_bound[1]]
+        self.S = pd.Series(S, index=X.index).to_numpy()[self.frame_bound[0] - self.window_size: self.frame_bound[1]]
+
         # Return prices and the features (inputs for the model)
         return prices.astype(np.float32), features.astype(np.float32)
+    
+    def compute_step_reward(self, _, current_tick, action):
+        if action == self.ACTION_BUY:
+            return self.B[current_tick] * 100
+        elif action == self.ACTION_SELL:
+            return self.S[current_tick] * 100
+        else:
+            return 0

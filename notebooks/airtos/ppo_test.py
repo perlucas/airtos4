@@ -72,7 +72,7 @@ policy_kwargs = dict(net_arch=layers_list)
 
 # Create model
 # env = SwitchEnvWrapper(env=get_random_train_env(), switch_interval=PARAM_SWITCH_ENV_INTERVAL)
-env = testing_env(no_action_punishment=2)
+env = testing_env(no_action_punishment=0)
 
 def get_model():
     return PPO(
@@ -90,12 +90,12 @@ def get_model():
 
 
 best_mean = 0
-for i in range(3):
+for i in range(1):
     model = get_model()
     
     # SB3 callback to evaluate the policy and log in TB
-    callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=550, verbose=1)
-    stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=10, min_evals=10, verbose=1)
+    callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=100, verbose=1)
+    stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=5, min_evals=10, verbose=1)
     eval_callback = EvalCallback(
         eval_env,
         n_eval_episodes=2,
@@ -116,3 +116,14 @@ for i in range(3):
         best_mean = mean
         model.save(os.path.join(LOG_DIR, 'model'))
         print(f'Saved model with mean reward {mean}')
+
+        # evaluate the model
+        obs, info = eval_env.reset()
+        while True:
+            action, _state = model.predict(obs, deterministic=True)
+            obs, reward, done, truncated, info = eval_env.step(action)
+
+            if done or truncated:
+                break
+
+        eval_env.save_render('envs-img')

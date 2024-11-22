@@ -4,30 +4,17 @@ import matplotlib.pyplot as plt
 
 from gymnasium import spaces
 
-from envs.trading_session import TradingSession
-from envs.budged_trading_session import BudgedTradingSession
-
-
-# Possible Actions the agent can choose
-ACTION_NOOP = 0
-ACTION_BUY = 1
-ACTION_SELL = 2
-
-_MIN_ACTION = ACTION_NOOP
-_MAX_ACTION = ACTION_SELL
-
-# Posible number of shares the agent can trade: 5 shares, 10 shares or 20 shares
-def extract_action_and_num_shares(code):
-    """Extract the action and number of shares from the encoded action"""
-    code_action_map = [
-        ('noop', 0),  # No op
-        ('buy', 1),   # buy
-        ('sell', 1),  # sell
-    ]
-    return code_action_map[code]
 
 
 class TradingEnv(gym.Env):
+    # Possible Actions the agent can choose
+    ACTION_NOOP = 0
+    ACTION_BUY = 1
+    ACTION_SELL = 2
+
+    _MIN_ACTION = ACTION_NOOP
+    _MAX_ACTION = ACTION_SELL
+
     """Trading Environment implementing the OpenAI Gym interface"""
     metadata = {"render_modes": [], "render_fps": 1}
 
@@ -68,7 +55,7 @@ class TradingEnv(gym.Env):
         )
 
         # Define action space
-        self.action_space = spaces.Discrete(_MAX_ACTION - _MIN_ACTION + 1)
+        self.action_space = spaces.Discrete(self._MAX_ACTION - self._MIN_ACTION + 1)
 
         # Values needed for initializing episodes
 
@@ -82,8 +69,6 @@ class TradingEnv(gym.Env):
         self._profit = None
         self._punishment_on_no_action = no_action_punishment
         self._cumulated_punish_counter = 0
-        self._session = TradingSession(fee = 2)
-        # self._session = BudgedTradingSession(fee = 2, initial_budget = 1000)
 
 
     def _get_observation(self):
@@ -100,7 +85,6 @@ class TradingEnv(gym.Env):
         return {
             "profit": self._profit,
             "progress": self._current_tick / self._end_tick,
-            "budget": self._session.budget,
         }
 
     def reset(self, seed=None, options=None):
@@ -111,7 +95,6 @@ class TradingEnv(gym.Env):
         self._current_tick = self._start_tick
         self._profit = 0
         self._cumulated_punish_counter = 0
-        self._session.reset()
 
         observation = self._get_observation()
         info = self._get_info()
@@ -124,21 +107,13 @@ class TradingEnv(gym.Env):
         current_price = self.prices[ self._current_tick ]
 
         # Compute step reward and add it to profit
-        step_reward = 0
-        action, num_shares = extract_action_and_num_shares(action_code)
+        step_reward = self.compute_step_reward(current_price, self._current_tick, action_code)
 
         # Increase punishment on consecutive no actions
         self._cumulated_punish_counter += 1
-
-        # Check if stop loss is hit for any open position
-        self._session.check_stop_loss(current_price)
         
         # Execute action
-        if action == 'buy':
-            _, step_reward = self._session.open_long(current_price, num_shares)
-            self._cumulated_punish_counter = 0
-        elif action == 'sell':
-            _, step_reward = self._session.open_short(current_price, num_shares)
+        if action_code != self.ACTION_NOOP:
             self._cumulated_punish_counter = 0
 
         # Add punishment for no action
@@ -156,13 +131,15 @@ class TradingEnv(gym.Env):
         if self._current_tick == self._end_tick:
             # Finish episode if reached last tick
             episode_ended = True
-            _, final_reward = self._session.end_session(current_price)
-            self._profit += final_reward
 
         observation = self._get_observation()
 
         # Move on to next step or finish episode
         return observation, step_reward, episode_ended, False, self._get_info()
+    
+    def compute_step_reward(self, current_price, current_tick, action_code):
+        """Compute the reward for the current step"""
+        raise NotImplementedError
 
 
     def close(self):
@@ -185,9 +162,9 @@ class TradingEnv(gym.Env):
         """
 
         COLOR_CODES = {
-            ACTION_NOOP: None,
-            ACTION_BUY: '#57b01c', # green
-            ACTION_SELL: '#e6110e', # red
+            self.ACTION_NOOP: None,
+            self.ACTION_BUY: '#57b01c', # green
+            self.ACTION_SELL: '#e6110e', # red
         }
 
         plt.cla()

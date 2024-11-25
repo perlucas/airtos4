@@ -75,6 +75,7 @@ class CombinedEnv(TradingEnv):
         TP = 0.1      # Take Profit (10%)
         SL = 0.05      # Stop Loss (5%)
         W = 15    # Window size (look ahead W ticks)
+        FEE = 0.04 # Fee (2% per transaction, open and close)
         MAX_OFFSET = len(self.df)  # Maximum offset (use the length of the data as the limit)
         
         # Algorithm for calculating the 'B' indicator
@@ -99,8 +100,8 @@ class CombinedEnv(TradingEnv):
         B = []
         S = []
         for idx, _ in X.items():
-            B.append(calculate_B(idx, X, TP, SL, W, MAX_OFFSET))
-            S.append(calculate_S(idx, X, TP, SL, W, MAX_OFFSET))
+            B.append(calculate_B(idx, X, TP, SL, W, MAX_OFFSET) - FEE)
+            S.append(calculate_S(idx, X, TP, SL, W, MAX_OFFSET) - FEE)
 
         # Convert the result into a pandas Series (if needed)
         self.B = pd.Series(B, index=X.index).to_numpy()[self.frame_bound[0] - self.window_size: self.frame_bound[1]]

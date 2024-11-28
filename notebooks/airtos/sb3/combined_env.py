@@ -81,18 +81,30 @@ class CombinedEnv(TradingEnv):
         # Algorithm for calculating the 'B' indicator
         def calculate_B(i, X, TP, SL, W, MAX_OFFSET):
             t = 1
+            tp = TP
+            sl = SL
+            delta = 0.1
             for j in range(i + 1, min(i + W, MAX_OFFSET)):  # Loop within window size or MAX_OFFSET
                 t *= (1 + X[j])
-                if t - 1 >= TP or t - 1 <= -SL:
-                    return t - 1  # Return the profit/loss if the threshold is met
+                if t - 1 >= tp:
+                    tp += delta
+                    sl -= delta # Increase the take profit and the stop loss
+                elif t - 1 <= -sl:
+                    return t - 1  # Return the loss if the threshold is met
             return t - 1  # If the loop completes, return the final value of t - 1
         
         # Algorithm for calculating the 'S' indicator
         def calculate_S(i, X, TP, SL, W, MAX_OFFSET):
             t = 1
+            tp = TP
+            sl = SL
+            delta = 0.1
             for j in range(i + 1, min(i + W, MAX_OFFSET)):  # Loop within window size or MAX_OFFSET
                 t *= (1 - X[j])
-                if t - 1 >= TP or t - 1 <= -SL:
+                if t - 1 >= tp:
+                    tp += delta
+                    sl -= delta # Increase the take profit and the stop loss
+                elif t - 1 <= -SL:
                     return t - 1  # Return the profit/loss if the threshold is met
             return t - 1  # If the loop completes, return the final value of t - 1
 

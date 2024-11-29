@@ -77,7 +77,7 @@ def create_training_envs(env_type: str, no_action_punishment=0):
         create_env(env_type, pypl_df, window_size, (500, 545), no_action_punishment=no_action_punishment),
         create_env(env_type, pypl_df, window_size, (600, 645), no_action_punishment=no_action_punishment),
         create_env(env_type, pypl_df, window_size, (700, 745), no_action_punishment=no_action_punishment),
-        create_env(env_type, pypl_df, window_size, (800, 845), no_action_punishment=no_action_punishment),
+        create_env(env_type, pypl_df, window_size, (1000, 1100), no_action_punishment=no_action_punishment),
 
         # NFLX training envs
         create_env(env_type, nflx_df, window_size, (800, 845), no_action_punishment=no_action_punishment),
@@ -148,7 +148,7 @@ def create_testing_env(env_type: str, no_action_punishment=0):
     
     ko_df = load_dataset(file_to_path('PYPL.csv'))
     window_size = 10
-    return create_env(env_type, ko_df, window_size, (1100, 1145), no_action_punishment=no_action_punishment)
+    return create_env(env_type, ko_df, window_size, (850, 950), no_action_punishment=no_action_punishment)
 
 
 def create_custom_env(ticker: str, frame_bound: tuple, no_action_punishment=0):

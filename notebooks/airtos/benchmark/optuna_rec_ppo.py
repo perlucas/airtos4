@@ -17,6 +17,7 @@ import torch.nn as nn
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from utils.envs.sb3 import testing_env, random_train_env_getter
+from rate_agent import evaluate_all
 
 
 eval_env = testing_env(no_action_punishment=0)
@@ -64,7 +65,7 @@ RUNS_PER_TRIAL = 3
 
 def objective(trial):
     
-    learning_rate = trial.suggest_loguniform("learning_rate", 1e-8, 1e-4)
+    learning_rate = trial.suggest_loguniform("learning_rate", 2e-8, 5e-5)
     
     num_layers = trial.suggest_categorical("num_layers", [2, 4, 8, 10, 15])
     layer_units = trial.suggest_categorical("layer_units", [25, 50, 100])
@@ -89,7 +90,7 @@ def objective(trial):
             tensorboard_log=LOG_DIR)
     
     def train_model(model):
-        callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=550, verbose=1)
+        callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=200, verbose=1)
         stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=5, min_evals=10, verbose=1)
         eval_callback = EvalCallback(
             eval_env,
@@ -112,16 +113,25 @@ def objective(trial):
         mean, _unused = evaluate_policy(model, eval_env, n_eval_episodes=2)
         total_eval_results.append(mean)
         model.logger.close()
-
-        if mean > 100:
-            model.save(os.path.join(LOG_DIR, f'trial_{trial.number}_best_model'))
-            print(f'New best model saved with mean return: {mean}, trial: {trial.number}')
+        
+        if mean >= 35:
+            alt_eval_results = evaluate_all(model)
+            if alt_eval_results['perc_profitables'] > 0.7:
+                model.save(os.path.join(LOG_DIR, f'trial_{trial.number}_best_model'))
+                print(
+                    'New best model saved with mean return: {mean}, %profitables: {perc_profitables}, trial: {trial.number}'
+                    .format(mean=mean, perc_profitables=alt_eval_results['perc_profitables'], trial=trial.number)
+                )
 
         model = None
     
     return sum(total_eval_results) / len(total_eval_results)
 
-study = optuna.create_study(direction="maximize")
+study = optuna.create_study(
+    direction="maximize",
+    pruner=optuna.pruners.HyperbandPruner(),
+    sampler=optuna.samplers.TPESampler(n_startup_trials=100),
+)
 study.optimize(objective, n_trials=300, n_jobs=1)
 
 print('Finished!')

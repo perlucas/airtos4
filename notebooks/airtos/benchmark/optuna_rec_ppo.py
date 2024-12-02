@@ -120,7 +120,7 @@ def objective(trial):
                 model.save(os.path.join(LOG_DIR, f'trial_{trial.number}_best_model'))
                 print(
                     'New best model saved with mean return: {mean}, %profitables: {perc_profitables}, trial: {trial_number}'
-                    .format(mean=mean, perc_profitables=alt_eval_results['perc_profitables'], trial=trial.number)
+                    .format(mean=mean, perc_profitables=alt_eval_results['perc_profitables'], trial_number=trial.number)
                 )
 
         model = None

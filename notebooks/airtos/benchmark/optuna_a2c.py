@@ -118,7 +118,7 @@ def objective(trial):
             if alt_eval_results['perc_profitables'] > 0.7:
                 model.save(os.path.join(LOG_DIR, f'trial_{trial.number}_best_model'))
                 print(
-                    'New best model saved with mean return: {mean}, %profitables: {perc_profitables}, trial: {trial.number}'
+                    'New best model saved with mean return: {mean}, %profitables: {perc_profitables}, trial: {trial_number}'
                     .format(mean=mean, perc_profitables=alt_eval_results['perc_profitables'], trial=trial.number)
                 )
 

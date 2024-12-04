@@ -61,7 +61,7 @@ class SwitchEnvWrapper(gymnasium.Wrapper):
 
 
 # =============================== Init and Run Tuner ===============================================
-RUNS_PER_TRIAL = 3
+RUNS_PER_TRIAL = 1
 
 def objective(trial):
     
@@ -86,7 +86,6 @@ def objective(trial):
             gamma=0.99,
             batch_size=128,
             seed=42,
-            normalize_advantage=True,
             tensorboard_log=LOG_DIR)
     
     def train_model(model):
@@ -110,19 +109,20 @@ def objective(trial):
         model = get_model()
         train_model(model)
 
-        mean, _unused = evaluate_policy(model, eval_env, n_eval_episodes=2)
-        total_eval_results.append(mean)
-        model.logger.close()
-        
-        if mean >= 35:
-            alt_eval_results = evaluate_all(model)
-            if alt_eval_results['perc_profitables'] > 0.7:
-                model.save(os.path.join(LOG_DIR, f'trial_{trial.number}_best_model'))
-                print(
-                    'New best model saved with mean return: {mean}, %profitables: {perc_profitables}, trial: {trial_number}'
-                    .format(mean=mean, perc_profitables=alt_eval_results['perc_profitables'], trial_number=trial.number)
-                )
+        alt_eval_results = evaluate_all(model, use_lstm=True)
+        perc_profitables = alt_eval_results['perc_profitables']
+        total_eval_results.append(perc_profitables)
 
+
+        if perc_profitables >= 0.7:
+            mean, _unused = evaluate_policy(model, eval_env, n_eval_episodes=2)
+            model.save(os.path.join(LOG_DIR, f'trial_{trial.number}_best_model'))
+            print(
+                'New best model saved with mean return: {mean}, %profitables: {perc_profitables}, trial: {trial_number}'
+                .format(mean=mean, perc_profitables=perc_profitables, trial_number=trial.number)
+            )
+
+        model.logger.close()
         model = None
     
     return sum(total_eval_results) / len(total_eval_results)

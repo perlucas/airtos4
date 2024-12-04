@@ -59,6 +59,30 @@ def evaluate_model(model, env, ticker, render_dir=None):
         "profitable": info['profit'] > 0,
     }
 
+def evaluate_model_lstm(model, env, ticker, render_dir=None):
+    lstm_states = None
+    episode_start = True
+    total_reward = 0
+    obs, info = env.reset()
+    while True:
+        action, lstm_states = model.predict(obs, state=lstm_states, episode_start=episode_start, deterministic=True)
+        obs, reward, done, truncated, info = env.step(action)
+        episode_start = done
+        total_reward += reward
+
+        if done or truncated:
+            break
+    
+    if render_dir:
+        env.save_render(f"{render_dir}/{ticker}")
+
+    return {
+        "total_profit": info['profit'],
+        "total_reward": total_reward,
+        "score": compute_score(info['profit']),
+        "profitable": info['profit'] > 0,
+    }
+
 # Evaluation tickers
 KNOWN_ENVS = [
     # 5 known tickers (using unknown frame bounds)
@@ -88,7 +112,7 @@ OTHER_SECTOR_ENVS = [
     ("BKNG", (1200, 1245))
 ]
 
-def evaluate_group(env_specs, model, output_dir = None):
+def evaluate_group(env_specs, model, output_dir = None, use_lstm = False):
     num_profitables = 0
     score = 0
     total_profit = 0
@@ -97,7 +121,7 @@ def evaluate_group(env_specs, model, output_dir = None):
     for specs in env_specs:
         ticker, frame_bounds = specs
         env = create_custom_env(ticker, frame_bounds, no_action_punishment=0)
-        result = evaluate_model(model, env, ticker, output_dir)
+        result = evaluate_model(model, env, ticker, output_dir) if not use_lstm else evaluate_model_lstm(model, env, ticker, output_dir)
         if result['profitable']:
             num_profitables += 1
         score += result['score']
@@ -133,14 +157,14 @@ GROUPS_TO_EVALUATE = [
     }
 ]
 
-def evaluate_all(model):
+def evaluate_all(model, use_lstm=False):
     """Mimics the main evaluation loop, but returns the results instead of printing them"""
     total_profitables = 0
     perc_avg = 0
     total_len = 0
 
     for group in GROUPS_TO_EVALUATE:
-        group_results = evaluate_group(group['envs'], model)
+        group_results = evaluate_group(group['envs'], model, output_dir=None, use_lstm=use_lstm)
         total_profitables += group_results['num_profitables']
         perc_avg += group_results['perc_profitables']
         total_len += len(group['envs'])

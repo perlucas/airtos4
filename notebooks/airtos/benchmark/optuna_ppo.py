@@ -65,13 +65,14 @@ RUNS_PER_TRIAL = 1
 
 def objective(trial):
     
-    learning_rate = trial.suggest_loguniform("learning_rate", 5e-7, 1e-5)
+    learning_rate = trial.suggest_loguniform("learning_rate", 3e-6, 3e-5)
     
-    num_layers = trial.suggest_categorical("num_layers", [2, 4, 8, 10, 15])
-    layer_units = trial.suggest_categorical("layer_units", [25, 50, 100])
+    num_layers = trial.suggest_categorical("num_layers", [2, 4, 6, 8, 10])
+    layer_units = trial.suggest_categorical("layer_units", [25, 30, 40, 50])
     layers_list = [layer_units] * num_layers
 
-    activation_fn = trial.suggest_categorical("activation_fn", ["ReLU", "LeakyReLU", "ELU"])
+    # activation_fn = trial.suggest_categorical("activation_fn", ["ReLU", "LeakyReLU", "ELU"])
+    activation_fn = "ELU"
 
     policy_kwargs = dict(net_arch=layers_list, activation_fn=getattr(nn, activation_fn))
 
@@ -89,12 +90,12 @@ def objective(trial):
             tensorboard_log=LOG_DIR)
     
     def train_model(model):
-        callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=200, verbose=1)
+        # callback_on_best = StopTrainingOnRewardThreshold(reward_threshold=200, verbose=1)
         stop_train_callback = StopTrainingOnNoModelImprovement(max_no_improvement_evals=5, min_evals=10, verbose=1)
         eval_callback = EvalCallback(
             eval_env,
             n_eval_episodes=2,
-            callback_on_new_best=callback_on_best,
+            # callback_on_new_best=callback_on_best,
             callback_after_eval=stop_train_callback,
             eval_freq=PARAM_EVAL_INTERVAL_EPISODES * PARAM_COLLECT_STEPS_PER_ITERATION)
 

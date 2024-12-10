@@ -122,10 +122,20 @@ class CombinedEnv(TradingEnv):
         # Return prices and the features (inputs for the model)
         return prices.astype(np.float32), features.astype(np.float32)
     
-    def compute_step_reward(self, _, current_tick, action):
+    def compute_step_reward_pct(self, _, current_tick, action):
         if action == self.ACTION_BUY:
             return self.B[current_tick] * 100
         elif action == self.ACTION_SELL:
             return self.S[current_tick] * 100
         else:
             return 0
+        
+    def normalize_reward_pct(self, reward_pct):
+        if reward_pct >= 10:
+            return 1
+        elif reward_pct > 0:
+            return 0.5
+        elif reward_pct == 0:
+            return 0
+        else:
+            return -1

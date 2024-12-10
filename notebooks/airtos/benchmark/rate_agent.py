@@ -56,7 +56,7 @@ def evaluate_model(model, env, ticker, render_dir=None):
         "total_profit": info['profit'],
         "total_reward": total_reward,
         "score": compute_score(info['profit']),
-        "profitable": info['profit'] > 0,
+        "profitable": info['profit'] > 1,
     }
 
 def evaluate_model_lstm(model, env, ticker, render_dir=None):
@@ -80,7 +80,7 @@ def evaluate_model_lstm(model, env, ticker, render_dir=None):
         "total_profit": info['profit'],
         "total_reward": total_reward,
         "score": compute_score(info['profit']),
-        "profitable": info['profit'] > 0,
+        "profitable": info['profit'] > 1,
     }
 
 # Evaluation tickers
@@ -162,16 +162,19 @@ def evaluate_all(model, use_lstm=False):
     total_profitables = 0
     perc_avg = 0
     total_len = 0
+    total_profit = 0
 
     for group in GROUPS_TO_EVALUATE:
         group_results = evaluate_group(group['envs'], model, output_dir=None, use_lstm=use_lstm)
         total_profitables += group_results['num_profitables']
         perc_avg += group_results['perc_profitables']
         total_len += len(group['envs'])
+        total_profit += group_results['total_profit']
 
     return {
         "perc_profitables": total_profitables / total_len,
         "avg_income": perc_avg / total_len,
+        "avg_roe": total_profit / total_len,
     }
 
 # Main evaluation loop: load the model and evaluate it on the different groups, printing the results

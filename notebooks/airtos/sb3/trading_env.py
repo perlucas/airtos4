@@ -93,7 +93,7 @@ class TradingEnv(gym.Env):
 
         self._history = []
         self._current_tick = self._start_tick
-        self._profit = 0
+        self._profit = 1
         self._cumulated_punish_counter = 0
 
         observation = self._get_observation()
@@ -107,7 +107,7 @@ class TradingEnv(gym.Env):
         current_price = self.prices[ self._current_tick ]
 
         # Compute step reward and add it to profit
-        step_reward = self.compute_step_reward(current_price, self._current_tick, action_code)
+        step_reward_pct = self.compute_step_reward_pct(current_price, self._current_tick, action_code)
 
         # Increase punishment on consecutive no actions
         self._cumulated_punish_counter += 1
@@ -118,9 +118,9 @@ class TradingEnv(gym.Env):
 
         # Add punishment for no action
         punishment = self._cumulated_punish_counter * self._punishment_on_no_action
-        step_reward -= punishment
+        # step_reward -= punishment
         
-        self._profit += step_reward
+        self._profit *= (step_reward_pct/100 + 1)
 
         # Store history for rendering
         self._history.append(action_code)
@@ -135,10 +135,15 @@ class TradingEnv(gym.Env):
         observation = self._get_observation()
 
         # Move on to next step or finish episode
+        step_reward = self.normalize_reward_pct(step_reward_pct)
         return observation, step_reward, episode_ended, False, self._get_info()
     
-    def compute_step_reward(self, current_price, current_tick, action_code):
+    def compute_step_reward_pct(self, current_price, current_tick, action_code):
         """Compute the reward for the current step"""
+        raise NotImplementedError
+    
+    def normalize_reward_pct(self, reward_pct):
+        """Normalize the reward percentage"""
         raise NotImplementedError
 
 

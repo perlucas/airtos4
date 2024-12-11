@@ -64,10 +64,10 @@ class SwitchEnvWrapper(gymnasium.Wrapper):
 RUNS_PER_TRIAL = 1
 
 def objective(trial):    
-    learning_rate = trial.suggest_loguniform("learning_rate", 7e-5, 5e-4)
+    learning_rate = trial.suggest_loguniform("learning_rate", 7e-5, 4e-4)
     
-    num_layers = trial.suggest_categorical("num_layers", [8, 10, 12, 15])
-    layer_units = trial.suggest_categorical("layer_units", [75, 100, 125, 150])
+    num_layers = trial.suggest_categorical("num_layers", [4, 6, 8])
+    layer_units = trial.suggest_categorical("layer_units", [100])
     layers_list = [layer_units] * num_layers
 
     # activation_fn = trial.suggest_categorical("activation_fn", ["ReLU", "LeakyReLU", "ELU"])

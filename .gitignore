@@ -2,6 +2,8 @@
 **/.ipynb_checkpoints/**
 /notebooks/airtos/tuner
 /notebooks/airtos/keras_tuner
-/notebooks/airtos/lab
+/notebooks/airtos/lab/results*.txt
+/notebooks/airtos/lab/models/*
+/notebooks/airtos/lab/img/*
 /notebooks/airtos/**/2024-*
 *.DS_Store

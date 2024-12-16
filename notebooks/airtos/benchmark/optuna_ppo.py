@@ -65,10 +65,10 @@ RUNS_PER_TRIAL = 1
 
 def objective(trial):
     
-    learning_rate = trial.suggest_loguniform("learning_rate", 5e-5, 5e-4)
+    learning_rate = trial.suggest_loguniform("learning_rate", 6e-5, 1e-4)
     
-    num_layers = trial.suggest_categorical("num_layers", [4,7, 8, 9])
-    layer_units = trial.suggest_categorical("layer_units", [50, 25, 27])
+    num_layers = trial.suggest_categorical("num_layers", [4, 8])
+    layer_units = trial.suggest_categorical("layer_units", [24, 27, 30])
     layers_list = [layer_units] * num_layers
 
     # activation_fn = trial.suggest_categorical("activation_fn", ["ReLU", "LeakyReLU", "ELU"])
